@@ -15,7 +15,7 @@ from models.workflow import WorkflowDefinition, ExecutionPlan
 from core.intelligence import MainAgent
 from core.workflow import WorkflowOrchestrator
 from tools.mcp import MCPToolRegistry
-from api.dto import RoleDefinition, RoleRecommendation
+from api.dto import RoleDefinition, APIRoleRecommendation, CreateTaskRequest, TaskResponse, WorkflowExecutionRequest, RoleRecommendationRequest
 
 logger = structlog.get_logger(__name__)
 
@@ -25,52 +25,27 @@ router = APIRouter(prefix="/api/v1", tags=["uagent"])
 # 依赖注入
 async def get_main_agent() -> MainAgent:
     """获取主Agent实例"""
-    # 这里应该从全局状态获取
-    raise HTTPException(status_code=503, detail="主Agent未初始化")
+    # 从main.py中导入全局实例
+    from api.main import main_agent
+    if main_agent is None:
+        raise HTTPException(status_code=503, detail="主Agent未初始化")
+    return main_agent
 
 async def get_workflow_orchestrator() -> WorkflowOrchestrator:
     """获取工作流编排器实例"""
-    # 这里应该从全局状态获取
-    raise HTTPException(status_code=503, detail="工作流编排器未初始化")
+    # 从main.py中导入全局实例
+    from api.main import workflow_orchestrator
+    if workflow_orchestrator is None:
+        raise HTTPException(status_code=503, detail="工作流编排器未初始化")
+    return workflow_orchestrator
 
 async def get_tool_registry() -> MCPToolRegistry:
     """获取工具注册表实例"""
-    # 这里应该从全局状态获取
-    raise HTTPException(status_code=503, detail="工具注册表未初始化")
-
-
-# 请求/响应模型
-class CreateTaskRequest(BaseModel):
-    """创建任务请求"""
-    title: str
-    description: str
-    domain: str
-    complexity: str
-    expected_output: str
-    user_preferences: Optional[Dict[str, Any]] = None
-
-
-class TaskResponse(BaseModel):
-    """任务响应"""
-    task_id: str
-    status: str
-    message: str
-    data: Optional[Dict[str, Any]] = None
-
-
-class WorkflowExecutionRequest(BaseModel):
-    """工作流执行请求"""
-    task_id: str
-    selected_roles: List[str]
-    execution_config: Optional[Dict[str, Any]] = None
-
-
-class RoleRecommendationRequest(BaseModel):
-    """角色推荐请求"""
-    task_description: str
-    domain: str
-    complexity: str
-    output_requirements: str
+    # 从main.py中导入全局实例
+    from api.main import tool_registry
+    if tool_registry is None:
+        raise HTTPException(status_code=503, detail="工具注册表未初始化")
+    return tool_registry
 
 
 # 任务管理API
@@ -199,7 +174,7 @@ async def list_roles(
         raise HTTPException(status_code=500, detail=f"获取角色列表失败: {str(e)}")
 
 
-@router.post("/roles/recommend", response_model=List[RoleRecommendation])
+@router.post("/roles/recommend", response_model=List[APIRoleRecommendation])
 async def recommend_roles(
     request: RoleRecommendationRequest,
     main_agent: MainAgent = Depends(get_main_agent)

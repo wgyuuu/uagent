@@ -17,6 +17,7 @@ from models.base import (
     WorkflowExecution, ErrorSeverity
 )
 from .dependency_analyzer import FailureImpactAssessment
+from tools.llm import LLMManager
 
 logger = structlog.get_logger(__name__)
 
@@ -28,14 +29,14 @@ class ErrorRecoveryController:
     负责错误分类、恢复策略生成和恢复决策制定
     """
     
-    def __init__(self, llm: BaseLLM):
+    def __init__(self, llm_manager: LLMManager):
         """
         初始化错误恢复控制器
         
         Args:
-            llm: 大语言模型实例
+            llm_manager: LLM管理器实例
         """
-        self.llm = llm
+        self.llm = llm_manager.get_llm_for_scene("error_recovery")
         self.recovery_history: List[Dict[str, Any]] = []
         self.recovery_strategies_cache: Dict[str, List[RecoveryStrategy]] = {}
         

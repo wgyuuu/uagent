@@ -9,12 +9,10 @@ import json
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import structlog
-from langchain.llms.base import BaseLLM
 from langchain.prompts import PromptTemplate
-from langchain.schema import BaseMessage
 
-from models.base import Task, TaskAnalysis, TaskDomain, TaskType, ComplexityLevel, ValidationResult
-from models.roles import RoleCapabilities
+from models.base import ComplexityLevel, Task, TaskAnalysis, TaskDomain, TaskType, ValidationResult
+from tools.llm import LLMManager
 
 logger = structlog.get_logger(__name__)
 
@@ -26,14 +24,14 @@ class TaskAnalysisEngine:
     使用大语言模型深度理解用户任务，进行多维度分析和分类
     """
     
-    def __init__(self, llm: BaseLLM):
+    def __init__(self, llm_manager: LLMManager):
         """
         初始化任务分析引擎
         
         Args:
-            llm: 大语言模型实例
+            llm_manager: LLM管理器实例
         """
-        self.llm = llm
+        self.llm = llm_manager.get_llm_for_scene("task_analysis")
         self.analysis_cache: Dict[str, TaskAnalysis] = {}
         self.analysis_history: List[Dict[str, Any]] = []
         

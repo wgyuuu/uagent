@@ -14,9 +14,12 @@ from langchain.schema import BaseMessage
 
 from models.base import (
     Task, TaskAnalysis, RoleRecommendation, WorkflowExecution,
-    RecoveryDecision, ErrorClassification, ValidationResult
+    RecoveryDecision, ErrorClassification, ValidationResult, TaskType
 )
 from models.workflow import WorkflowDefinition, ExecutionPlan
+from models.roles import RoleFactory
+from utils.common import generate_id
+from tools.llm import LLMManager
 from .task_analysis import TaskAnalysisEngine
 from .role_recommendation import RoleRecommendationEngine
 from .dependency_analyzer import DependencyAnalyzer
@@ -33,23 +36,24 @@ class MainAgent:
     """
     
     def __init__(self, 
-                 llm: BaseLLM,
+                 llm_manager: LLMManager,
                  config: Dict[str, Any] = None):
         """
         初始化主Agent
         
         Args:
-            llm: 大语言模型实例
+            llm_manager: LLM管理器实例
             config: 配置参数
         """
-        self.llm = llm
+        self.llm = llm_manager.get_llm_for_scene("main_agent")
         self.config = config or {}
         
-        # 初始化子组件
-        self.task_analyzer = TaskAnalysisEngine(llm)
-        self.role_recommender = RoleRecommendationEngine(llm)
+        # 初始化子组件时传入场景信息
+        self.task_analyzer = TaskAnalysisEngine(llm_manager)
+        self.role_recommender = RoleRecommendationEngine(llm_manager)
         self.dependency_analyzer = DependencyAnalyzer()
-        self.error_recovery = ErrorRecoveryController(llm)
+        self.error_recovery = ErrorRecoveryController(llm_manager)
+        self.role_factory = RoleFactory() # 添加role_factory属性
         
         # 决策历史
         self.decision_history: List[Dict[str, Any]] = []
@@ -125,6 +129,133 @@ class MainAgent:
             
             logger.error(f"任务分析失败: {e}")
             raise
+
+    async def analyze_task_and_recommend_roles(self, task: Task) -> tuple[TaskAnalysis, RoleRecommendation]:
+        """
+        分析任务并推荐角色（用于后台任务）
+        
+        Args:
+            task: 待分析的任务
+            
+        Returns:
+            tuple: (任务分析结果, 角色推荐结果)
+        """
+        try:
+            logger.info(f"开始分析任务并推荐角色: {task.task_id}")
+            
+            # 1. 任务分析
+            task_analysis = await self.task_analyzer.analyze_task(task)
+            logger.info(f"任务分析完成: 领域={task_analysis.primary_domain}, 类型={task_analysis.task_type}")
+            
+            # 2. 角色推荐
+            role_recommendation = await self.role_recommender.recommend_roles(task_analysis)
+            logger.info(f"角色推荐完成: {role_recommendation.recommended_sequence}")
+            
+            # 3. 记录决策
+            await self._record_decision("task_analysis_and_role_recommendation", {
+                "task_id": task.task_id,
+                "analysis": task_analysis.dict(),
+                "recommendation": role_recommendation.dict()
+            })
+            
+            return task_analysis, role_recommendation
+            
+        except Exception as e:
+            logger.error(f"任务分析和角色推荐失败: {e}")
+            raise
+
+    async def recommend_roles(self, 
+                            task_description: str,
+                            domain: str,
+                            complexity: str,
+                            output_requirements: str) -> List[Dict[str, Any]]:
+        """
+        基于任务描述推荐角色（API接口使用）
+        
+        Args:
+            task_description: 任务描述
+            domain: 任务领域
+            complexity: 任务复杂度
+            output_requirements: 输出要求
+            
+        Returns:
+            List[RoleRecommendation]: 角色推荐列表
+        """
+        try:
+            logger.info(f"开始角色推荐: domain={domain}, complexity={complexity}")
+            
+            # 1. 创建临时任务对象用于分析
+            from models.base import Task, ComplexityLevel, TaskDomain
+            
+            # 映射复杂度字符串到枚举
+            complexity_map = {
+                "simple": ComplexityLevel.SIMPLE,
+                "medium": ComplexityLevel.MODERATE,
+                "complex": ComplexityLevel.COMPLEX,
+                "expert": ComplexityLevel.ENTERPRISE
+            }
+            
+            # 映射领域字符串到枚举
+            domain_map = {
+                "software_development": TaskDomain.SOFTWARE_DEVELOPMENT,
+                "data_analysis": TaskDomain.DATA_ANALYSIS,
+                "financial_analysis": TaskDomain.FINANCIAL_ANALYSIS,
+                "content_creation": TaskDomain.CONTENT_CREATION,
+                "information_processing": TaskDomain.INFORMATION_PROCESSING
+            }
+            
+            temp_task = Task(
+                title="临时任务",
+                description=task_description,
+                domain=domain_map.get(domain, TaskDomain.SOFTWARE_DEVELOPMENT),
+                task_type=TaskType.NEW_DEVELOPMENT,  # 默认任务类型
+                complexity_level=complexity_map.get(complexity, ComplexityLevel.MODERATE),
+                created_by="main_agent",
+                metadata={"expected_output": output_requirements}
+            )
+            
+            # 2. 分析任务
+            task_analysis = await self.task_analyzer.analyze_task(temp_task)
+            
+            # 3. 推荐角色
+            role_recommendation = await self.role_recommender.recommend_roles(task_analysis)
+            
+            # 4. 转换为API响应格式
+            recommendations = []
+            for role_name in role_recommendation.recommended_sequence:
+                # 获取角色详细信息
+                role = self.role_factory.create_role(role_name) if hasattr(self, 'role_factory') else None
+                
+                recommendation = {
+                    "role_id": role_name,
+                    "name": role_name,
+                    "description": role.config.description if role else f"{role_name}角色",
+                    "domain": domain,
+                    "capabilities": [str(domain) for domain in role.config.capabilities.primary_domains] if role else [f"{role_name}相关能力"],
+                    "confidence_score": role_recommendation.confidence_score,
+                    "reasoning": role_recommendation.reasoning.get(role_name, f"推荐{role_name}角色"),
+                    "estimated_time": role_recommendation.estimated_timeline.get(role_name, "2-4小时")
+                }
+                recommendations.append(recommendation)
+            
+            logger.info(f"角色推荐完成: 推荐了{len(recommendations)}个角色")
+            return recommendations
+            
+        except Exception as e:
+            logger.error(f"角色推荐失败: {e}")
+            # 返回默认推荐
+            return [
+                {
+                    "role_id": "coding_expert",
+                    "name": "编码专家",
+                    "description": "负责代码编写和实现",
+                    "domain": domain,
+                    "capabilities": ["代码编写", "算法实现"],
+                    "confidence_score": 0.5,
+                    "reasoning": "默认推荐编码专家",
+                    "estimated_time": "2-4小时"
+                }
+            ]
     
     async def handle_workflow_error(self, 
                                   workflow: WorkflowExecution,
@@ -283,7 +414,7 @@ class MainAgent:
                 input_variables=["original_task", "execution_results", "quality_criteria"]
             )
             
-            prompt = optimization_prompt.format(
+            prompt = evaluation_prompt.format(
                 original_task=workflow.task.description,
                 execution_results=str(workflow.role_results),
                 quality_criteria=str(workflow.task.quality_standards)

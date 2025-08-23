@@ -14,6 +14,8 @@ from core.intelligence import MainAgent
 from core.workflow import WaterfallWorkflowEngine, WorkflowOrchestrator
 from core.context import ContextIsolationManager
 from tools.mcp import MCPToolRegistry
+from tools.llm import LLMManager
+from api.routes import register_routes
 
 logger = structlog.get_logger(__name__)
 
@@ -45,6 +47,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# 注册API路由
+register_routes(app)
+
 # 添加中间件
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +65,7 @@ app.add_middleware(
 )
 
 # 全局组件实例
+llm_manager: LLMManager = None
 main_agent: MainAgent = None
 workflow_engine: WaterfallWorkflowEngine = None
 workflow_orchestrator: WorkflowOrchestrator = None
@@ -69,23 +75,26 @@ tool_registry: MCPToolRegistry = None
 
 async def initialize_core_components():
     """初始化核心组件"""
-    global main_agent, workflow_engine, workflow_orchestrator, context_manager, tool_registry
+    global llm_manager, main_agent, workflow_engine, workflow_orchestrator, context_manager, tool_registry
     
     try:
+        # 初始化LLM管理器
+        llm_manager = LLMManager()
+        
         # 初始化工具注册表
         tool_registry = MCPToolRegistry()
         
         # 初始化上下文管理器
         context_manager = ContextIsolationManager()
         
-        # 初始化主Agent（这里需要LLM实例）
-        # main_agent = MainAgent(llm_instance)
+        # 初始化主Agent（传入LLM管理器）
+        main_agent = MainAgent(llm_manager)
         
         # 初始化工作流引擎
-        # workflow_engine = WaterfallWorkflowEngine(main_agent)
+        workflow_engine = WaterfallWorkflowEngine(main_agent)
         
         # 初始化工作流编排器
-        # workflow_orchestrator = WorkflowOrchestrator(main_agent, workflow_engine)
+        workflow_orchestrator = WorkflowOrchestrator(main_agent, workflow_engine)
         
         logger.info("核心组件初始化完成")
         
@@ -96,7 +105,7 @@ async def initialize_core_components():
 
 async def cleanup_core_components():
     """清理核心组件"""
-    global main_agent, workflow_engine, workflow_orchestrator, context_manager, tool_registry
+    global llm_manager, main_agent, workflow_engine, workflow_orchestrator, context_manager, tool_registry
     
     try:
         # 清理资源
@@ -120,85 +129,6 @@ async def root():
         "status": "running",
         "description": "通用任务完成的多Agent协作系统"
     }
-
-
-@app.get("/health")
-async def health_check():
-    """健康检查"""
-    try:
-        # 检查核心组件状态
-        component_status = {
-            "tool_registry": tool_registry is not None,
-            "context_manager": context_manager is not None,
-            "main_agent": main_agent is not None,
-            "workflow_engine": workflow_engine is not None,
-            "workflow_orchestrator": workflow_orchestrator is not None
-        }
-        
-        all_healthy = all(component_status.values())
-        
-        return {
-            "status": "healthy" if all_healthy else "degraded",
-            "components": component_status,
-            "timestamp": "2024-01-14T00:00:00Z"  # 这里应该使用实际时间
-        }
-        
-    except Exception as e:
-        logger.error(f"健康检查失败: {e}")
-        raise HTTPException(status_code=500, detail="健康检查失败")
-
-
-@app.get("/api/v1/system/info")
-async def get_system_info():
-    """获取系统信息"""
-    return {
-        "system_name": "UAgent System",
-        "version": "2.0.0",
-        "architecture": {
-            "intelligence_layer": "智能决策层 - 任务分析、角色推荐、错误恢复",
-            "workflow_layer": "工作流层 - 瀑布式执行、状态管理、监控",
-            "context_layer": "上下文层 - 角色隔离、8段式压缩、交接管理",
-            "tool_layer": "工具层 - MCP集成、用户交互、工具管理",
-            "infrastructure_layer": "基础设施层 - 并发管理、持久化、监控"
-        },
-        "capabilities": [
-            "多领域任务处理",
-            "智能角色推荐", 
-            "瀑布式工作流执行",
-            "上下文隔离管理",
-            "MCP工具集成",
-            "用户实时交互"
-        ],
-        "supported_domains": [
-            "软件开发",
-            "数据分析", 
-            "金融分析",
-            "内容创作",
-            "信息处理"
-        ]
-    }
-
-
-@app.get("/api/v1/system/stats")
-async def get_system_stats():
-    """获取系统统计信息"""
-    try:
-        stats = {}
-        
-        if tool_registry:
-            stats["tools"] = tool_registry.get_registry_stats()
-        
-        if context_manager:
-            stats["context"] = await context_manager.get_context_stats()
-        
-        return {
-            "system_stats": stats,
-            "timestamp": "2024-01-14T00:00:00Z"
-        }
-        
-    except Exception as e:
-        logger.error(f"获取系统统计失败: {e}")
-        raise HTTPException(status_code=500, detail="获取系统统计失败")
 
 
 if __name__ == "__main__":
