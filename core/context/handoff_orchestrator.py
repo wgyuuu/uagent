@@ -10,8 +10,7 @@ from datetime import datetime
 import json
 from dataclasses import dataclass, asdict
 
-from ...models.base import HandoffContext, IsolatedRoleContext, RoleResult
-from ...models.roles import RoleDefinition
+from models.base import HandoffContext, IsolatedRoleContext, RoleResult
 
 logger = structlog.get_logger(__name__)
 

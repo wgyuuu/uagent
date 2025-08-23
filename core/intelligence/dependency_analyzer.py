@@ -10,8 +10,8 @@ from datetime import datetime
 import structlog
 from dataclasses import dataclass
 
-from ...models.base import ValidationResult
-from ...models.roles import RoleDependencies, RoleFactory
+from models.base import ValidationResult
+from models.roles import RoleCapabilities, RoleDependencies, RoleFactory
 
 logger = structlog.get_logger(__name__)
 

@@ -9,8 +9,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import structlog
 
-from ...models.base import IsolatedRoleContext, HandoffContext, RoleResult
-from ...models.workflow import WorkflowExecution
+from models.base import IsolatedRoleContext, HandoffContext, RoleResult
 
 logger = structlog.get_logger(__name__)
 

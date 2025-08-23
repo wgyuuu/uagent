@@ -10,15 +10,13 @@ from datetime import datetime
 import structlog
 from dataclasses import dataclass
 
-from ...models.base import (
+from models.base import (
     WorkflowExecution, RoleResult, HandoffContext, 
-    IsolatedRoleContext, WorkflowStatus, RoleStatus
+    IsolatedRoleContext, WorkflowStatus, RoleStatus, ValidationResult, RecoveryDecision, RecoveryStrategy
 )
-from ...models.workflow import WorkflowStep, ExecutionMetrics
-from ...core.intelligence import MainAgent
+from models.workflow import WorkflowStep, ExecutionMetrics
+from core.intelligence import MainAgent
 
-if TYPE_CHECKING:
-    from .waterfall_engine import ValidationResult, RecoveryDecision, RecoveryStrategy
 
 logger = structlog.get_logger(__name__)
 

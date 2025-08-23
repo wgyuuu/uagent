@@ -11,7 +11,7 @@ import json
 import hashlib
 from dataclasses import dataclass, asdict
 
-from ...models.base import IsolatedRoleContext
+from models.base import IsolatedRoleContext
 
 logger = structlog.get_logger(__name__)
 

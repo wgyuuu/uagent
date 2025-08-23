@@ -10,8 +10,7 @@ from datetime import datetime, timedelta
 import uuid
 from dataclasses import dataclass
 
-from ...models.base import IsolatedRoleContext, HandoffContext
-from ...models.roles import RoleDefinition
+from models.base import IsolatedRoleContext, HandoffContext
 
 logger = structlog.get_logger(__name__)
 

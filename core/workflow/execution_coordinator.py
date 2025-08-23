@@ -9,9 +9,9 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import structlog
 
-from ...models.base import WorkflowExecution, RoleResult
-from ...models.workflow import ExecutionMetrics, WorkflowStep
-from .waterfall_engine import WaterfallWorkflowEngine
+from models.base import WorkflowExecution, RoleResult
+from models.workflow import ExecutionMetrics, WorkflowStep
+from core.workflow.waterfall_engine import WaterfallWorkflowEngine
 
 logger = structlog.get_logger(__name__)
 

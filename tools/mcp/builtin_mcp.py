@@ -10,7 +10,7 @@ import asyncio
 from datetime import datetime
 import traceback
 
-from ...models.base import ToolExecutionResult
+from models.base import ToolExecutionResult
 from .builtin_tools import (
     FileReadTool, FileWriteTool, CodeAnalyzeTool, 
     TextSummarizeTool, SystemInfoTool, DataValidateTool

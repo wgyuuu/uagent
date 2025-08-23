@@ -5,10 +5,12 @@ UAgent Workflow Models
 """
 
 from enum import Enum
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Callable
 from datetime import datetime, timedelta
 from uuid import uuid4
 from pydantic import BaseModel, Field, validator
+
+from models.roles import RoleFactory
 from .base import (
     WorkflowStatus, RoleStatus, TaskStatus, ComplexityLevel,
     Task, TaskAnalysis, RoleResult, HandoffContext,

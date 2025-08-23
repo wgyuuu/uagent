@@ -9,8 +9,8 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import structlog
 
-from ...models.base import WorkflowExecution, WorkflowStatus
-from ...models.workflow import WorkflowState, WorkflowEvent, WorkflowEventHandler
+from models.base import WorkflowExecution, WorkflowStatus
+from models.workflow import WorkflowState, WorkflowEvent, WorkflowEventHandler
 
 logger = structlog.get_logger(__name__)
 

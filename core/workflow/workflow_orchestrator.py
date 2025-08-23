@@ -10,10 +10,10 @@ from datetime import datetime
 import structlog
 from dataclasses import dataclass
 
-from ...models.base import Task, WorkflowExecution, WorkflowStatus
-from ...models.workflow import WorkflowDefinition, ExecutionPlan
-from ...core.intelligence import MainAgent
-from .waterfall_engine import WaterfallWorkflowEngine
+from models.base import Task, WorkflowExecution, WorkflowStatus
+from models.workflow import WorkflowDefinition, ExecutionPlan
+from core.intelligence import MainAgent
+from core.workflow.waterfall_engine import WaterfallWorkflowEngine
 
 logger = structlog.get_logger(__name__)
 

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 import uuid
 
-from ...models.base import MCPToolDefinition, ToolExecutionResult, UserInteraction, UserSession
+from models.base import MCPToolDefinition, ToolExecutionResult, UserSession
 
 logger = structlog.get_logger(__name__)
 

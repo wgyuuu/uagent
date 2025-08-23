@@ -12,11 +12,11 @@ from langchain.llms.base import BaseLLM
 from langchain.prompts import PromptTemplate
 from langchain.schema import BaseMessage
 
-from ...models.base import (
+from models.base import (
     Task, TaskAnalysis, RoleRecommendation, WorkflowExecution,
     RecoveryDecision, ErrorClassification, ValidationResult
 )
-from ...models.workflow import WorkflowDefinition, ExecutionPlan
+from models.workflow import WorkflowDefinition, ExecutionPlan
 from .task_analysis import TaskAnalysisEngine
 from .role_recommendation import RoleRecommendationEngine
 from .dependency_analyzer import DependencyAnalyzer

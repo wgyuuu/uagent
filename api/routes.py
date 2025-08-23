@@ -10,12 +10,12 @@ from typing import List, Optional, Dict, Any
 import structlog
 from pydantic import BaseModel
 
-from ..models.base import Task, WorkflowExecution, RoleResult
-from ..models.roles import RoleDefinition, RoleRecommendation
-from ..models.workflow import WorkflowDefinition, ExecutionPlan
-from ..core.intelligence import MainAgent
-from ..core.workflow import WorkflowOrchestrator
-from ..tools.mcp import MCPToolRegistry
+from models.base import Task, WorkflowExecution, RoleResult
+from models.workflow import WorkflowDefinition, ExecutionPlan
+from core.intelligence import MainAgent
+from core.workflow import WorkflowOrchestrator
+from tools.mcp import MCPToolRegistry
+from api.dto import RoleDefinition, RoleRecommendation
 
 logger = structlog.get_logger(__name__)
 
@@ -462,14 +462,6 @@ async def get_role_performance(
     except Exception as e:
         logger.error(f"获取角色性能失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取角色性能失败: {str(e)}")
-
-
-# 错误处理
-@router.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """全局异常处理器"""
-    logger.error(f"未处理的异常: {exc}")
-    return {"error": "内部服务器错误", "detail": str(exc)}
 
 
 # 注册路由到主应用

@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import structlog
 
-from ...models.base import MCPToolDefinition, ToolExecutionResult
+from models.base import MCPToolDefinition, ToolExecutionResult
 
 logger = structlog.get_logger(__name__)
 

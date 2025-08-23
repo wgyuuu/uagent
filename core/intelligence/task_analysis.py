@@ -13,8 +13,8 @@ from langchain.llms.base import BaseLLM
 from langchain.prompts import PromptTemplate
 from langchain.schema import BaseMessage
 
-from ...models.base import Task, TaskAnalysis, TaskDomain, TaskType, ComplexityLevel
-from ...models.roles import RoleCapabilities
+from models.base import Task, TaskAnalysis, TaskDomain, TaskType, ComplexityLevel, ValidationResult
+from models.roles import RoleCapabilities
 
 logger = structlog.get_logger(__name__)
 

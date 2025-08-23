@@ -12,7 +12,7 @@ import structlog
 from langchain.llms.base import BaseLLM
 from langchain.prompts import PromptTemplate
 
-from ...models.base import (
+from models.base import (
     ErrorClassification, RecoveryStrategy, RecoveryDecision,
     WorkflowExecution, ErrorSeverity
 )

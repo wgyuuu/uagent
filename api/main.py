@@ -10,10 +10,10 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import structlog
 from contextlib import asynccontextmanager
 
-from ..core.intelligence import MainAgent
-from ..core.workflow import WaterfallWorkflowEngine, WorkflowOrchestrator
-from ..core.context import ContextIsolationManager
-from ..tools.mcp import MCPToolRegistry
+from core.intelligence import MainAgent
+from core.workflow import WaterfallWorkflowEngine, WorkflowOrchestrator
+from core.context import ContextIsolationManager
+from tools.mcp import MCPToolRegistry
 
 logger = structlog.get_logger(__name__)
 

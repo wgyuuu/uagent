@@ -15,7 +15,7 @@ from dataclasses import dataclass, asdict
 import hashlib
 import time
 
-from ...models.base import MCPToolDefinition, ToolExecutionResult
+from models.base import MCPToolDefinition, ToolExecutionResult
 
 logger = structlog.get_logger(__name__)
 

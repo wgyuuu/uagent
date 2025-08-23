@@ -12,9 +12,9 @@ import structlog
 from langchain.llms.base import BaseLLM
 from langchain.prompts import PromptTemplate
 
-from ...models.base import TaskAnalysis, RoleRecommendation
-from ...models.roles import RoleFactory, RoleCapabilities, ExpertRole
-from ...models.workflow import WorkflowTemplate, StandardWorkflowTemplates
+from models.base import ComplexityLevel, TaskAnalysis, RoleRecommendation, ValidationResult
+from models.roles import RoleFactory, RoleCapabilities, ExpertRole
+from models.workflow import WorkflowTemplate, StandardWorkflowTemplates
 
 logger = structlog.get_logger(__name__)
 
