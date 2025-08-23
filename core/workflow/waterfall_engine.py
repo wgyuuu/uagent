@@ -5,7 +5,7 @@ UAgent Waterfall Workflow Engine
 """
 
 import asyncio
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Optional, Any, Callable, TYPE_CHECKING
 from datetime import datetime
 import structlog
 from dataclasses import dataclass
@@ -16,6 +16,9 @@ from ...models.base import (
 )
 from ...models.workflow import WorkflowStep, ExecutionMetrics
 from ...core.intelligence import MainAgent
+
+if TYPE_CHECKING:
+    from .waterfall_engine import ValidationResult, RecoveryDecision, RecoveryStrategy
 
 logger = structlog.get_logger(__name__)
 

@@ -1,0 +1,54 @@
+---
+template_id: error_handling
+name: 错误处理模板
+description: 错误情况的处理和恢复指导
+template_type: error_handling
+format: jinja2
+version: 1.0.0
+author: system
+tags: [error, recovery, guidance]
+variables: [error_type, error_message, context, recovery_options]
+required_variables: [error_type, error_message]
+---
+
+# 错误处理指南
+
+## 错误信息
+- **错误类型**: {{ error_type }}
+- **错误消息**: {{ error_message }}
+- **发生时间**: {{ current_time | format_timestamp }}
+
+## 上下文
+{% if context %}
+{{ context }}
+{% else %}
+无上下文信息
+{% endif %}
+
+## 恢复选项
+{% if recovery_options %}
+{% for option in recovery_options %}
+### 选项 {{ loop.index }}: {{ option.name }}
+**描述**: {{ option.description }}
+**难度**: {{ option.difficulty }}
+**预计时间**: {{ option.estimated_time }}
+**风险**: {{ option.risk }}
+
+{% endfor %}
+{% else %}
+需要人工分析确定恢复策略
+{% endif %}
+
+## 建议行动
+1. 分析错误根本原因
+2. 评估影响范围
+3. 选择合适的恢复策略
+4. 实施恢复措施
+5. 验证恢复效果
+6. 记录经验教训
+
+## 预防措施
+- 加强输入验证
+- 完善错误处理机制
+- 增加监控和告警
+- 定期进行测试

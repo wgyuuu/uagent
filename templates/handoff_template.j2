@@ -1,0 +1,58 @@
+---
+template_id: handoff_template
+name: 角色交接模板
+description: 角色间任务交接的标准模板
+template_type: handoff
+format: jinja2
+version: 1.0.0
+author: system
+tags: [handoff, workflow, communication]
+variables: [from_role, to_role, task_summary, completed_work, next_actions, context, artifacts]
+required_variables: [from_role, to_role, task_summary]
+---
+
+# 任务交接文档
+
+## 交接信息
+- **交接方**: {{ from_role }}
+- **接收方**: {{ to_role }}
+- **交接时间**: {{ current_time | format_timestamp }}
+
+## 任务概述
+{{ task_summary }}
+
+## 已完成工作
+{% if completed_work %}
+{{ completed_work }}
+{% else %}
+暂无已完成工作记录
+{% endif %}
+
+## 下一步行动
+{% if next_actions %}
+{{ next_actions }}
+{% else %}
+需要接收方确定下一步行动
+{% endif %}
+
+## 上下文信息
+{% if context %}
+{{ context }}
+{% else %}
+无额外上下文信息
+{% endif %}
+
+## 产出物和资源
+{% if artifacts %}
+{% for artifact in artifacts %}
+- {{ artifact.name }}: {{ artifact.description }}
+  位置: {{ artifact.location }}
+{% endfor %}
+{% else %}
+暂无产出物
+{% endif %}
+
+## 注意事项
+- 请确认理解任务要求
+- 如有疑问请及时询问
+- 保持工作连续性和一致性

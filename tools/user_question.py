@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 import uuid
 
-from ..mcp.user_interaction_mcp import UserInteractionMCPService, InteractionRequest, InteractionResponse
+from tools.mcp.user_interaction_mcp import UserInteractionMCPService, InteractionRequest, InteractionResponse
 
 logger = structlog.get_logger(__name__)
 
