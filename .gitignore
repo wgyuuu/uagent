@@ -1,0 +1,23 @@
+# 过滤日志文件
+*.log
+*.log.*
+
+# 过滤临时文件
+*.tmp
+*.tmp.*
+
+# 过滤pycache
+__pycache__
+
+# 过滤vscode
+.vscode
+
+# 过滤venv
+venv
+.venv
+
+# 过滤pyenv
+.pyenv
+
+# 过滤文件
+.DS_Store
