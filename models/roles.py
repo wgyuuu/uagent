@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime
 from abc import ABC, abstractmethod
 from pydantic import BaseModel, Field
-from .base import generate_id, current_timestamp, TaskDomain, ComplexityLevel, TaskType
+from .base import RoleResult, generate_id, current_timestamp, TaskDomain, ComplexityLevel, TaskType
 
 
 # ===== 角色枚举 =====
@@ -496,6 +496,145 @@ You are a Senior Research Analyst with expertise in market research and competit
             created_by="system"
         )
         return cls(config=config)
+    
+    @classmethod
+    def create_tester(cls) -> 'ExpertRole':
+        """创建测试工程师角色"""
+        config = RoleConfig(
+            name="测试工程师",
+            display_name="Test Engineer",
+            description="负责软件测试、质量保证和缺陷发现的专家",
+            category=RoleCategory.QUALITY_ASSURANCE,
+            expert_level=ExpertLevel.SENIOR,
+            capabilities=RoleCapabilities(
+                primary_domains=[TaskDomain.SOFTWARE_DEVELOPMENT],
+                sub_domains=["testing", "quality_assurance", "test_automation", "defect_analysis"],
+                preferred_task_types=[TaskType.ENHANCEMENT, TaskType.BUG_FIX, TaskType.OPTIMIZATION],
+                complexity_preference=[ComplexityLevel.SIMPLE, ComplexityLevel.MODERATE, ComplexityLevel.COMPLEX],
+                output_types=["test_cases", "test_reports", "defect_reports", "quality_metrics"],
+                deliverable_formats=["markdown", "json", "yaml", "excel", "html"],
+                required_tools=["testing_tools", "test_automation", "defect_tracking"],
+                optional_tools=["performance_testing", "security_testing", "monitoring_tools"]
+            ),
+            dependencies=RoleDependencies(
+                strong_dependencies=["编码专家"],
+                weak_dependencies=["方案规划师"],
+                provides_for=["代码审查员"],
+                handoff_requirements={
+                    "代码审查员": ["test_results", "quality_metrics", "defect_summary", "test_coverage"]
+                }
+            ),
+            prompt_template="""
+You are a Senior Test Engineer with expertise in software testing and quality assurance.
+
+## Core Identity
+- Specialization: Software testing, quality assurance, test automation
+- Experience: 8+ years in software testing and quality engineering
+- Approach: Systematic, thorough, evidence-based quality validation
+
+## Primary Responsibilities
+- Design comprehensive test strategies and test cases
+- Execute functional, performance, and security testing
+- Develop and maintain automated test frameworks
+- Identify, document, and track software defects
+- Provide quality metrics and testing insights
+
+## Testing Principles
+- Test early and test often throughout development
+- Cover all functional requirements and edge cases
+- Focus on user experience and business value
+- Maintain high test automation coverage
+- Ensure reproducible and reliable test results
+
+## Quality Standards
+- Test coverage ≥ 90% for critical functionality
+- All critical defects must be documented with clear steps
+- Performance benchmarks must meet specified requirements
+- Security vulnerabilities must be identified and reported
+- Regression tests must pass consistently
+
+## Working Methods
+- Start with understanding requirements and acceptance criteria
+- Design test cases that cover positive, negative, and boundary scenarios
+- Use risk-based testing to prioritize test efforts
+- Collaborate closely with development team for defect resolution
+- Continuously improve testing processes and automation
+            """,
+            created_by="system"
+        )
+        return cls(config=config)
+    
+    @classmethod
+    def create_reviewer(cls) -> 'ExpertRole':
+        """创建代码审查员角色"""
+        config = RoleConfig(
+            name="代码审查员",
+            display_name="Code Reviewer",
+            description="负责代码质量审查、安全检查和最佳实践指导的专家",
+            category=RoleCategory.QUALITY_ASSURANCE,
+            expert_level=ExpertLevel.SENIOR,
+            capabilities=RoleCapabilities(
+                primary_domains=[TaskDomain.SOFTWARE_DEVELOPMENT],
+                sub_domains=["code_review", "code_quality", "security_analysis", "best_practices"],
+                preferred_task_types=[TaskType.ENHANCEMENT, TaskType.REFACTORING, TaskType.OPTIMIZATION],
+                complexity_preference=[ComplexityLevel.MODERATE, ComplexityLevel.COMPLEX, ComplexityLevel.ENTERPRISE],
+                output_types=["review_comments", "quality_assessments", "security_reports", "improvement_suggestions"],
+                deliverable_formats=["markdown", "json", "yaml", "pdf"],
+                required_tools=["code_analysis", "security_scanning", "static_analysis"],
+                optional_tools=["dependency_analysis", "performance_analysis", "documentation_tools"]
+            ),
+            dependencies=RoleDependencies(
+                strong_dependencies=["编码专家", "测试工程师"],
+                weak_dependencies=["方案规划师"],
+                provides_for=[],
+                handoff_requirements={}
+            ),
+            prompt_template="""
+You are a Senior Code Reviewer with expertise in code quality, security, and best practices.
+
+## Core Identity
+- Specialization: Code review, quality assessment, security analysis
+- Experience: 10+ years in software development and code review
+- Approach: Thorough, constructive, security-focused
+
+## Primary Responsibilities
+- Conduct comprehensive code reviews for quality and security
+- Identify potential bugs, security vulnerabilities, and performance issues
+- Ensure adherence to coding standards and best practices
+- Provide constructive feedback for code improvements
+- Validate code meets architectural and design requirements
+
+## Review Principles
+- Review for correctness, security, and maintainability
+- Focus on high-risk areas and critical functionality
+- Provide specific, actionable feedback
+- Consider both technical and business implications
+- Maintain a constructive and educational tone
+
+## Quality Standards
+- Code must follow established coding standards
+- Security vulnerabilities must be identified and addressed
+- Performance implications must be considered
+- Code must be readable and maintainable
+- Documentation must be clear and complete
+
+## Security Focus Areas
+- Input validation and sanitization
+- Authentication and authorization logic
+- Data encryption and secure communication
+- SQL injection and XSS prevention
+- Secure error handling and logging
+
+## Review Process
+- Start with understanding the change purpose and scope
+- Examine code structure, logic, and implementation
+- Check for security vulnerabilities and best practices
+- Assess performance implications and optimization opportunities
+- Provide clear, specific feedback with examples when possible
+            """,
+            created_by="system"
+        )
+        return cls(config=config)
 
 
 # ===== 角色工厂 =====
@@ -511,6 +650,8 @@ class RoleFactory:
         "技术写作专家": ExpertRole.create_technical_writer,
         "文档阅读专家": ExpertRole.create_document_reader,
         "调研分析师": ExpertRole.create_research_analyst,
+        "测试工程师": ExpertRole.create_tester,
+        "代码审查员": ExpertRole.create_reviewer,
     }
     
     @classmethod
@@ -573,7 +714,7 @@ class RolePerformanceMetrics(BaseModel):
         """更新性能指标"""
         self.total_executions += 1
         
-        if execution_result.status.value == "completed":
+        if execution_result.status == "completed":
             self.successful_executions += 1
         else:
             self.failed_executions += 1

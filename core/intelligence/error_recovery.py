@@ -131,6 +131,15 @@ class ErrorRecoveryController:
         try:
             logger.info(f"生成恢复策略: 错误={error_classification.error_id}")
             
+            # 检查错误修复适用性
+            if error_classification.error_recovery_applicable == "requires_system_fix":
+                logger.warning(f"错误 {error_classification.error_id} 属于系统级错误，无法通过错误修复功能解决")
+                return []
+            
+            if error_classification.error_recovery_applicable == "requires_manual_intervention":
+                logger.info(f"错误 {error_classification.error_id} 需要人工干预，不生成自动恢复策略")
+                return []
+            
             # 检查缓存
             cache_key = self._generate_strategy_cache_key(error_classification, impact_assessment)
             if cache_key in self.recovery_strategies_cache:
@@ -237,16 +246,21 @@ class ErrorRecoveryController:
 - **错误消息**: {error_message}
 - **上下文**: {context}
 
+## 重要说明
+⚠️ **错误修复限制**: 错误修复功能仅限于修复任务执行过程中的决策错误，不适用于系统级错误。
+
 ## 分类框架
 请按以下维度对错误进行分类：
 
 ### 1. 错误严重程度
-- **critical**: 系统级错误，无法继续执行
+- **critical**: 系统级错误，系统自身问题，无法继续执行，不属于错误修复范围
 - **major**: 重要功能受影响，但可能有变通方案
 - **minor**: 影响有限，可以稍后处理
 - **trivial**: 外观或非功能性问题
 
 ### 2. 错误类别
+- **system_bug**: 系统级错误，系统自身问题，无法通过错误修复解决
+- **task_decision_error**: 任务执行过程中的决策错误，属于错误修复范围
 - **technical**: 代码错误、配置问题、技术故障
 - **resource**: 缺少依赖、访问问题、资源约束
 - **logic**: 需求理解错误、设计缺陷
@@ -254,16 +268,34 @@ class ErrorRecoveryController:
 - **user**: 用户输入错误、权限问题
 
 ### 3. 恢复可行性
-- **easily_recoverable**: 简单修复，重试可能成功
-- **moderately_recoverable**: 需要一些干预，中等努力
-- **difficult_to_recover**: 需要复杂修复，高努力
-- **non_recoverable**: 根本性问题，需要重新设计
+- **easily_recoverable**: 简单修复，重试可能成功（仅适用于任务决策错误）
+- **moderately_recoverable**: 需要一些干预，中等努力（仅适用于任务决策错误）
+- **difficult_to_recover**: 需要复杂修复，高努力（仅适用于任务决策错误）
+- **non_recoverable**: 根本性问题，需要重新设计或系统修复
 
 ### 4. 工作流影响
 - **blocks_all**: 整个工作流无法继续
 - **blocks_dependent**: 只有依赖此角色的角色被阻塞
 - **degrades_quality**: 工作流可以继续但质量降低
 - **no_impact**: 其他角色可以正常进行
+
+### 5. 错误修复适用性
+- **fixable_by_error_recovery**: 可以通过错误修复功能解决（仅限任务决策错误）
+- **requires_system_fix**: 需要系统级修复，不属于错误修复范围
+- **requires_manual_intervention**: 需要人工干预和指导
+
+## 分类指导原则
+1. 如果错误是系统运行报错、系统bug、系统自身问题，应分类为：
+   - severity: critical
+   - category: system_bug
+   - recovery_feasibility: non_recoverable
+   - 错误修复适用性: requires_system_fix
+
+2. 如果错误是任务执行过程中的决策错误，应分类为：
+   - severity: major 或 minor
+   - category: task_decision_error
+   - recovery_feasibility: easily_recoverable 或 moderately_recoverable
+   - 错误修复适用性: fixable_by_error_recovery
 
 ## 输出格式
 请以JSON格式提供分类结果：
@@ -274,6 +306,7 @@ class ErrorRecoveryController:
     "category": "错误类别",
     "recovery_feasibility": "恢复可行性",
     "workflow_impact": "工作流影响",
+    "error_recovery_applicable": "错误修复适用性",
     "blocked_roles": ["被阻塞的角色"],
     "degraded_roles": ["降级的角色"],
     "confidence_score": 0.9,
@@ -287,6 +320,9 @@ class ErrorRecoveryController:
         return """
 你是UAgent系统的恢复策略专家，负责为错误情况生成恢复策略。
 
+## 重要说明
+⚠️ **错误修复限制**: 错误修复功能仅限于修复任务执行过程中的决策错误，不适用于系统级错误。
+
 ## 错误分类结果
 {error_classification}
 
@@ -296,7 +332,14 @@ class ErrorRecoveryController:
 ## 依赖影响分析
 {dependency_impact}
 
-## 可用恢复选项
+## 错误修复适用性检查
+在生成恢复策略之前，请确认错误是否属于错误修复范围：
+
+- **fixable_by_error_recovery**: 可以通过错误修复功能解决（仅限任务决策错误）
+- **requires_system_fix**: 需要系统级修复，不属于错误修复范围
+- **requires_manual_intervention**: 需要人工干预和指导
+
+## 可用恢复选项（仅适用于可修复的错误）
 1. **retry**: 使用相同或修改的参数重试同一角色
 2. **skip**: 跳过此角色，继续下一个角色
 3. **replace**: 用类似能力的角色替换失败角色
@@ -305,13 +348,13 @@ class ErrorRecoveryController:
 6. **abort**: 终止整个工作流
 
 ## 策略生成指导
+**重要**: 只有错误修复适用性为 "fixable_by_error_recovery" 的错误才能生成恢复策略。
+
 为每个可行的恢复选项提供：
 - **可行性**: 成功的可能性
 - **风险评估**: 潜在的负面后果
 - **资源需求**: 时间、精力或资源需求
 - **成功标准**: 如何判断策略是否有效
-
-请推荐前3个最合适的策略，按优先级排序。
 
 ## 输出格式
 请以JSON格式提供策略：
@@ -333,7 +376,20 @@ class ErrorRecoveryController:
         }}
     ],
     "recommended_strategy": "推荐的策略名称",
-    "confidence_score": 0.9
+    "confidence_score": 0.9,
+    "error_recovery_applicable": "错误修复适用性状态"
+}}
+```
+
+## 特殊情况处理
+如果错误不属于错误修复范围（如系统级错误），请返回：
+```json
+{{
+    "strategies": [],
+    "recommended_strategy": "none",
+    "confidence_score": 0.0,
+    "error_recovery_applicable": "requires_system_fix",
+    "reason": "此错误属于系统级错误，无法通过错误修复功能解决"
 }}
 ```
         """
@@ -387,11 +443,20 @@ class ErrorRecoveryController:
         else:
             category = "technical"
         
+        # 错误修复适用性识别
+        if severity == "critical" or any(keyword in text_lower for keyword in ["system", "bug", "崩溃", "系统"]):
+            error_recovery_applicable = "requires_system_fix"
+        elif any(keyword in text_lower for keyword in ["decision", "决策", "选择", "判断"]):
+            error_recovery_applicable = "fixable_by_error_recovery"
+        else:
+            error_recovery_applicable = "requires_manual_intervention"
+        
         return {
             "severity": severity,
             "category": category,
             "recovery_feasibility": "moderately_recoverable",
             "workflow_impact": "blocks_dependent",
+            "error_recovery_applicable": error_recovery_applicable,
             "blocked_roles": [],
             "degraded_roles": [],
             "confidence_score": 0.5
@@ -520,6 +585,15 @@ class ErrorRecoveryController:
                                               error_classification: ErrorClassification,
                                               strategies: List[RecoveryStrategy]) -> bool:
         """评估自动恢复可行性"""
+        # 检查错误修复适用性
+        if error_classification.error_recovery_applicable == "requires_system_fix":
+            logger.info(f"错误 {error_classification.error_id} 属于系统级错误，无法自动恢复")
+            return False
+        
+        if error_classification.error_recovery_applicable == "requires_manual_intervention":
+            logger.info(f"错误 {error_classification.error_id} 需要人工干预，无法自动恢复")
+            return False
+        
         # 严重错误需要人工干预
         if error_classification.severity in [ErrorSeverity.CRITICAL, ErrorSeverity.MAJOR]:
             return False
@@ -574,6 +648,15 @@ class ErrorRecoveryController:
     
     async def _generate_default_strategies(self, error_classification: ErrorClassification) -> List[RecoveryStrategy]:
         """生成默认恢复策略"""
+        # 检查错误修复适用性
+        if error_classification.error_recovery_applicable == "requires_system_fix":
+            logger.warning(f"错误 {error_classification.error_id} 属于系统级错误，不生成默认恢复策略")
+            return []
+        
+        if error_classification.error_recovery_applicable == "requires_manual_intervention":
+            logger.info(f"错误 {error_classification.error_id} 需要人工干预，不生成默认恢复策略")
+            return []
+        
         default_strategies = [
             RecoveryStrategy(
                 name="手动干预",
@@ -611,7 +694,8 @@ class ErrorRecoveryController:
             "severity": "major",
             "category": "technical", 
             "recovery_feasibility": "moderately_recoverable",
-            "workflow_impact": "blocks_dependent"
+            "workflow_impact": "blocks_dependent",
+            "error_recovery_applicable": "requires_manual_intervention"
         }
         
         return defaults.get(field, "unknown")
@@ -624,6 +708,7 @@ class ErrorRecoveryController:
             error_classification.severity.value,
             error_classification.category,
             error_classification.recovery_feasibility,
+            error_classification.error_recovery_applicable,
             impact_assessment.impact_level,
             str(len(impact_assessment.blocked_roles)),
             str(len(impact_assessment.degraded_roles))

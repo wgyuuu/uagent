@@ -14,6 +14,7 @@ from .models.llm_config import LLMConfig, ModelType, SceneConfig
 from .providers.base import BaseLLMProvider
 from .providers.openai_provider import OpenAIProvider
 from .providers.anthropic_provider import AnthropicProvider
+from .llm_logging_wrapper import LLMLoggingWrapper
 
 logger = structlog.get_logger(__name__)
 
@@ -112,8 +113,20 @@ class LLMManager:
         provider = self.providers[provider_type]
         llm = provider.get_langchain_llm(model_name, scene_config.params)
         
-        logger.info(f"为场景 {scene_key} 创建LLM: {provider_type}/{model_name}")
-        return llm
+        # 创建模型信息字典
+        model_info = {
+            "scene_key": scene_key,
+            "model_name": model_name,
+            "provider_type": provider_type,
+            "parameters": scene_config.params,
+            "provider_info": provider.get_provider_info()
+        }
+        
+        # 使用日志包装器包装LLM实例
+        wrapped_llm = LLMLoggingWrapper(llm, model_info)
+        
+        logger.info(f"为场景 {scene_key} 创建带日志的LLM: {provider_type}/{model_name}")
+        return wrapped_llm
     
     def get_scene_config(self, scene_key: str) -> Optional[SceneConfig]:
         """获取场景配置"""

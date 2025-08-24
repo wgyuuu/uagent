@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Any, Callable, TYPE_CHECKING
 from datetime import datetime
 import structlog
 from dataclasses import dataclass
+import traceback
 
 from models.base import (
     WorkflowExecution, RoleResult, HandoffContext, 
@@ -229,7 +230,7 @@ class WaterfallWorkflowEngine:
             workflow = self.active_workflows[workflow_id]
             return {
                 "workflow_id": workflow.workflow_id,
-                "status": workflow.status.value,
+                "status": workflow.status,
                 "current_role": workflow.get_current_role(),
                 "progress": f"{workflow.current_role_index}/{len(workflow.roles)}",
                 "started_at": workflow.started_at.isoformat() if workflow.started_at else None,
@@ -287,7 +288,6 @@ class WaterfallWorkflowEngine:
                 
                 # 更新当前角色索引
                 workflow.current_role_index = role_index
-                workflow.current_role = role
                 
                 # 执行角色
                 role_result = await self._execute_single_role(workflow, role, role_index)
@@ -303,7 +303,7 @@ class WaterfallWorkflowEngine:
                 logger.info(f"角色执行完成: {role}, 工作流: {workflow.workflow_id}")
                 
             except Exception as e:
-                logger.error(f"角色执行失败: {role}, 工作流: {workflow.workflow_id}, 错误: {e}")
+                logger.error(f"角色执行失败: {role}, 工作流: {workflow.workflow_id}, 错误: {e}, 堆栈信息: {traceback.format_exc()}")
                 
                 # 更新角色状态
                 workflow.role_statuses[role] = RoleStatus.FAILED
@@ -513,7 +513,7 @@ class WaterfallWorkflowEngine:
         if previous_results:
             results_summary = []
             for prev_role, result in previous_results.items():
-                results_summary.append(f"{prev_role}: {result.status.value}")
+                results_summary.append(f"{prev_role}: {result.status}")
             
             context.update_section(
                 "Problem Solving",

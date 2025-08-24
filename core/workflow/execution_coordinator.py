@@ -104,7 +104,7 @@ class ExecutionCoordinator:
             metrics.total_execution_time = elapsed_time
         
         # 更新角色执行指标
-        completed_roles = len([r for r in workflow.role_statuses.values() if r.value == "completed"])
+        completed_roles = len([r for r in workflow.role_statuses.values() if r == "completed"])
         if completed_roles > 0:
             metrics.average_step_time = metrics.total_execution_time / completed_roles
         
