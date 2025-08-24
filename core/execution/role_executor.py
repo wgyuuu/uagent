@@ -15,13 +15,14 @@ from core.execution.prompt_manager import PromptManager
 from core.execution.tool_manager import UnifiedToolManager
 from models.base import (
     RoleResult, 
+    RoleStatus,
     generate_id,
     ExecutionConfig,
     AgentEnvironment,
     ExecutionContext,
     IterationResult
 )
-from models.roles import RoleConfig
+from models.roles import RoleConfig, RoleFactory
 from .agent_runner import AgentRunner
 from .execution_controller import ExecutionController
 from .result_synthesizer import ResultSynthesizer
@@ -33,11 +34,10 @@ class RoleExecutor:
     
     def __init__(self, 
                  tool_manager: UnifiedToolManager,
-                 prompt_manager: PromptManager,
                  execution_config: ExecutionConfig = None):
         
         self.tool_manager = tool_manager
-        self.prompt_manager = prompt_manager
+        self.prompt_manager = PromptManager(tool_manager)
         self.config = execution_config or ExecutionConfig()
         
         # 核心组件
@@ -114,22 +114,12 @@ class RoleExecutor:
     
     async def _get_role_config(self, role: str) -> RoleConfig:
         """获取角色配置"""
-        # 这里应该从角色配置系统获取
-        # 暂时返回默认配置
-        return RoleConfig(
-            name=role,
-            display_name=role,
-            description=f"专业{role}角色",
-            category="software_development",
-            capabilities=None,
-            dependencies=None,
-            prompt_template="",
-            system_prompts={},
-            behavior_rules=[],
-            max_execution_time=3600,
-            retry_attempts=3,
-            resource_limits={}
-        )
+        # 使用RoleFactory获取预定义角色配置
+        expert_role = RoleFactory.create_role(role)
+        if not expert_role:
+            raise ValueError(f"角色 '{role}' 不存在，请检查角色名称是否正确")
+        
+        return expert_role.config
     
     async def _create_agent_environment(self, role: str, context: ExecutionContext, role_prompt: str) -> AgentEnvironment:
         """创建Agent运行环境"""
@@ -193,7 +183,7 @@ class RoleExecutor:
             execution_id=execution_id,
             role=role,
             task_id=execution_id,
-            status="COMPLETED",
+            status=RoleStatus.COMPLETED,
             outputs={
                 "status": "completed",
                 "message": f"角色 {role} 执行完成",
@@ -226,7 +216,7 @@ class RoleExecutor:
             execution_id=execution_id,
             role=role,
             task_id=execution_id,
-            status="FAILED",
+            status=RoleStatus.FAILED,
             outputs={
                 "status": "failed",
                 "message": f"角色 {role} 执行失败: {str(error)}",

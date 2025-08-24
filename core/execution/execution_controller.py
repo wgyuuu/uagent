@@ -7,6 +7,7 @@ Execution Controller
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 import structlog
+import logging
 
 from models.base import (
     HandoffContext, 
@@ -164,7 +165,7 @@ class ExecutionController:
         self.control_history.append(decision)
         
         # 记录到日志
-        log_level = "info" if can_continue else "warning"
+        log_level = logging.INFO if can_continue else logging.WARNING
         logger.log(log_level, f"执行控制决策 [轮次{iteration}]: {reason} -> {action}")
     
     def get_control_summary(self) -> Dict[str, Any]:

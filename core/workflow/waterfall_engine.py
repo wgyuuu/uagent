@@ -432,7 +432,6 @@ class WaterfallWorkflowEngine:
             # 创建角色执行器实例
             role_executor = RoleExecutor(
                 tool_manager=tool_manager,  # 使用新的统一工具管理器
-                prompt_manager=getattr(self.main_agent, 'prompt_manager', None),
                 execution_config=execution_config
             )
             
