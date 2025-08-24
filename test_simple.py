@@ -18,42 +18,40 @@ sys.path.insert(0, str(project_root))
 
 # 导入main.py中的组件
 from api.main import initialize_core_components, cleanup_core_components
+from core.intelligence import MainAgent
+from core.workflow import WaterfallWorkflowEngine, WorkflowOrchestrator
+from models.base import Task, TaskDomain, TaskType, ComplexityLevel
+import structlog
 
+logger = structlog.get_logger(__name__)
 
-async def run_simple_test(task_description: str = "创建一个简单的Python Hello World程序", components: Dict[str, Any] = None) -> Dict[str, Any]:
+async def run_simple_test(task_description: str = "创建一个简单的Python Hello World程序") -> Dict[str, Any]:
     """
     运行简单测试 - 初始化系统并执行一个任务
     
     Args:
         task_description: 任务描述
-        components: 初始化后的组件实例
         
     Returns:
         Dict: 测试结果
     """
     try:
         print("开始运行简单测试...")
+
+        # 1. 初始化系统组件
+        # 初始化主Agent（不再需要传入llm_manager参数）
+        main_agent = MainAgent()
+        logger.info("主Agent初始化完成")
         
-        # 1. 确保组件已初始化
-        if not components:
-            raise Exception("组件实例未提供")
-            
-        # 从组件字典中获取需要的组件
-        llm_manager = components.get("llm_manager")
-        main_agent = components.get("main_agent")
-        workflow_engine = components.get("workflow_engine")
-        workflow_orchestrator = components.get("workflow_orchestrator")
+        # 初始化工作流引擎
+        workflow_engine = WaterfallWorkflowEngine(main_agent)
+        logger.info("工作流引擎初始化完成")
         
-        init_faileds = []
-        for name, component in {"llm_manager": llm_manager, "main_agent": main_agent, "workflow_engine": workflow_engine, "workflow_orchestrator": workflow_orchestrator}.items():
-            if not component:
-                init_faileds.append(name)
-        if init_faileds:
-            raise Exception(f"核心组件未初始化: {init_faileds}")
+        # 初始化工作流编排器
+        workflow_orchestrator = WorkflowOrchestrator(main_agent, workflow_engine)
+        logger.info("工作流编排器初始化完成")
         
         # 2. 创建测试任务
-        from models.base import Task, TaskDomain, TaskType, ComplexityLevel
-        
         test_task = Task(
             title="简单测试任务",
             description=task_description,
@@ -166,14 +164,14 @@ async def main():
     try:
         # 1. 初始化系统组件
         print("📋 初始化系统组件...")
-        components = await initialize_core_components()
+        await initialize_core_components()
         print("✅ 系统组件初始化完成")
         
         # 2. 运行简单测试
         print("\n🧪 运行简单测试...")
         test_description = "创建一个简单的Python Hello World程序，包含main函数和打印语句"
         
-        result = await run_simple_test(test_description, components)
+        result = await run_simple_test(test_description)
         
         # 3. 输出测试结果
         print("\n📊 测试结果:")

@@ -113,7 +113,7 @@ class WorkflowOrchestrator:
                 metadata={
                     "priority": request.priority,
                     "timeout_minutes": request.timeout_minutes,
-                    "execution_plan": execution_plan.dict() if execution_plan else None
+                    "execution_plan": execution_plan.model_dump() if execution_plan else None
                 }
             )
             

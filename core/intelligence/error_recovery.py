@@ -29,14 +29,13 @@ class ErrorRecoveryController:
     负责错误分类、恢复策略生成和恢复决策制定
     """
     
-    def __init__(self, llm_manager: LLMManager):
+    def __init__(self):
         """
         初始化错误恢复控制器
-        
-        Args:
-            llm_manager: LLM管理器实例
         """
-        self.llm = llm_manager.get_llm_for_scene("error_recovery")
+        # 直接使用模块级函数获取LLM实例
+        from tools.llm import get_llm_for_scene
+        self.llm = get_llm_for_scene("error_recovery")
         self.recovery_history: List[Dict[str, Any]] = []
         self.recovery_strategies_cache: Dict[str, List[RecoveryStrategy]] = {}
         

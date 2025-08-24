@@ -25,14 +25,13 @@ class TaskAnalysisEngine:
     使用大语言模型深度理解用户任务，进行多维度分析和分类
     """
     
-    def __init__(self, llm_manager: LLMManager):
+    def __init__(self):
         """
         初始化任务分析引擎
-        
-        Args:
-            llm_manager: LLM管理器实例
         """
-        self.llm = llm_manager.get_llm_for_scene("task_analysis")
+        # 直接使用模块级函数获取LLM实例
+        from tools.llm import get_llm_for_scene
+        self.llm = get_llm_for_scene("task_analysis")
         self.analysis_cache: Dict[str, TaskAnalysis] = {}
         self.analysis_history: List[Dict[str, Any]] = []
         

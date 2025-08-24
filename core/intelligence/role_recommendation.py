@@ -16,7 +16,7 @@ import traceback
 from models.base import ComplexityLevel, TaskAnalysis, RoleRecommendation, ValidationResult
 from models.roles import RoleFactory, RoleCapabilities, ExpertRole
 from models.workflow import WorkflowTemplate, StandardWorkflowTemplates
-from tools.llm import LLMManager
+from tools.llm import get_llm_for_scene
 
 logger = structlog.get_logger(__name__)
 
@@ -28,14 +28,11 @@ class RoleRecommendationEngine:
     基于任务分析结果和角色能力矩阵，智能推荐最优的角色组合
     """
     
-    def __init__(self, llm_manager: LLMManager):
+    def __init__(self):
         """
         初始化角色推荐引擎
-        
-        Args:
-            llm_manager: LLM管理器实例
         """
-        self.llm = llm_manager.get_llm_for_scene("role_recommendation")
+        self.llm = get_llm_for_scene("role_recommendation")
         self.role_factory = RoleFactory()
         self.recommendation_cache: Dict[str, RoleRecommendation] = {}
         self.recommendation_history: List[Dict[str, Any]] = []

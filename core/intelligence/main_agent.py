@@ -20,7 +20,7 @@ from models.base import (
 from models.workflow import WorkflowDefinition, ExecutionPlan
 from models.roles import RoleFactory
 from utils.common import generate_id
-from tools.llm import LLMManager
+from tools.llm import get_llm_for_scene
 from .task_analysis import TaskAnalysisEngine
 from .role_recommendation import RoleRecommendationEngine
 from .dependency_analyzer import DependencyAnalyzer
@@ -37,23 +37,22 @@ class MainAgent:
     """
     
     def __init__(self, 
-                 llm_manager: LLMManager,
                  config: Dict[str, Any] = None):
         """
         初始化主Agent
         
         Args:
-            llm_manager: LLM管理器实例
             config: 配置参数
         """
-        self.llm = llm_manager.get_llm_for_scene("main_agent")
+        # 直接使用模块级函数获取LLM实例
+        self.llm = get_llm_for_scene("main_agent")
         self.config = config or {}
         
-        # 初始化子组件时传入场景信息
-        self.task_analyzer = TaskAnalysisEngine(llm_manager)
-        self.role_recommender = RoleRecommendationEngine(llm_manager)
+        # 初始化子组件时不再传入llm_manager参数
+        self.task_analyzer = TaskAnalysisEngine()
+        self.role_recommender = RoleRecommendationEngine()
         self.dependency_analyzer = DependencyAnalyzer()
-        self.error_recovery = ErrorRecoveryController(llm_manager)
+        self.error_recovery = ErrorRecoveryController()
         self.role_factory = RoleFactory() # 添加role_factory属性
         
         # 决策历史
@@ -113,8 +112,8 @@ class MainAgent:
             # 5. 记录决策
             await self._record_decision("task_analysis_and_planning", {
                 "task_id": task.task_id,
-                "analysis": task_analysis.dict(),
-                "recommendation": role_recommendation.dict(),
+                "analysis": task_analysis.model_dump(),
+                "recommendation": role_recommendation.model_dump(),
                 "workflow_id": workflow_definition.workflow_id
             })
             
@@ -155,8 +154,8 @@ class MainAgent:
             # 3. 记录决策
             await self._record_decision("task_analysis_and_role_recommendation", {
                 "task_id": task.task_id,
-                "analysis": task_analysis.dict(),
-                "recommendation": role_recommendation.dict()
+                "analysis": task_analysis.model_dump(),
+                "recommendation": role_recommendation.model_dump()
             })
             
             return task_analysis, role_recommendation

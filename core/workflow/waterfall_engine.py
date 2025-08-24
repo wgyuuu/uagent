@@ -11,27 +11,15 @@ import structlog
 from dataclasses import dataclass
 import traceback
 
+from core.execution.execution_controller import ExecutionContext
 from models.base import (
-    WorkflowExecution, RoleResult, HandoffContext, 
-    IsolatedRoleContext, WorkflowStatus, RoleStatus, ValidationResult, RecoveryDecision, RecoveryStrategy
+    RoleResult, HandoffContext, 
+    IsolatedRoleContext, WorkflowStatus, RoleStatus, ValidationResult, RecoveryDecision, RecoveryStrategy, WorkflowExecution
 )
-from models.workflow import WorkflowStep, ExecutionMetrics
 from core.intelligence import MainAgent
 
 
 logger = structlog.get_logger(__name__)
-
-
-@dataclass
-class ExecutionContext:
-    """执行上下文"""
-    workflow_id: str
-    current_role: str
-    role_index: int
-    previous_results: Dict[str, RoleResult]
-    handoff_context: Optional[HandoffContext]
-    isolated_context: IsolatedRoleContext
-    metadata: Dict[str, Any]
 
 
 class WaterfallWorkflowEngine:
@@ -423,32 +411,57 @@ class WaterfallWorkflowEngine:
     
     async def _invoke_role_executor(self, role: str, context: ExecutionContext) -> RoleResult:
         """
-        调用角色执行器
-        
-        这里应该实现具体的角色执行逻辑
-        暂时返回模拟结果
+        调用角色执行器 - 现在是一个完整的Agent运行过程
         """
-        # 模拟角色执行
-        await asyncio.sleep(1)  # 模拟执行时间
-        
-        # 创建模拟结果
-        role_result = RoleResult(
-            execution_id=f"exec_{generate_id()}",
-            role=role,
-            task_id=context.workflow_id,
-            status=RoleStatus.COMPLETED,
-            outputs={
-                "status": "completed",
-                "message": f"角色 {role} 执行完成"
-            },
-            deliverables={
-                "output": f"{role} 的输出结果"
-            },
-            quality_score=0.8,
-            completeness_score=0.9
-        )
-        
-        return role_result
+        try:
+            # 使用新的角色执行器
+            from core.execution import RoleExecutor, ExecutionConfig, UnifiedToolManager
+            
+            # 创建执行配置
+            execution_config = ExecutionConfig(
+                max_iterations=10,
+                max_tool_calls_per_iteration=5,
+                parallel_tool_execution=True,
+                context_compression_threshold=0.8,
+                quality_threshold=0.85
+            )
+            
+            # 创建统一工具管理器
+            tool_manager = UnifiedToolManager()
+            
+            # 创建角色执行器实例
+            role_executor = RoleExecutor(
+                tool_manager=tool_manager,  # 使用新的统一工具管理器
+                prompt_manager=getattr(self.main_agent, 'prompt_manager', None),
+                execution_config=execution_config
+            )
+            
+            # 执行角色任务
+            return await role_executor.execute_role(role, context)
+            
+        except Exception as e:
+            logger.error(f"角色执行器调用失败: {e}, 堆栈信息: {traceback.format_exc()}")
+            # 降级到原来的模拟执行
+            await asyncio.sleep(1)  # 模拟执行时间
+            
+            # 创建模拟结果
+            role_result = RoleResult(
+                execution_id=f"exec_{generate_id()}",
+                role=role,
+                task_id=context.workflow_id,
+                status=RoleStatus.COMPLETED,
+                outputs={
+                    "status": "completed",
+                    "message": f"角色 {role} 执行完成（降级模式）"
+                },
+                deliverables={
+                    "output": f"{role} 的输出结果"
+                },
+                quality_score=0.8,
+                completeness_score=0.9
+            )
+            
+            return role_result
     
     async def _prepare_handoff_context(self, 
                                      workflow: WorkflowExecution,

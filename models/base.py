@@ -714,3 +714,51 @@ WorkflowID = str
 ContextID = str
 UserID = str
 SessionID = str
+
+# ===== 执行相关模型 =====
+
+@dataclass
+class ExecutionConfig:
+    """执行配置"""
+    max_iterations: int = 10  # 最大执行轮数
+    max_tool_calls_per_iteration: int = 5  # 每轮最大工具调用数
+    parallel_tool_execution: bool = True  # 是否并行执行工具
+    context_compression_threshold: float = 0.8  # 上下文压缩阈值
+    quality_threshold: float = 0.85  # 质量阈值
+
+
+@dataclass
+class AgentEnvironment:
+    """Agent运行环境"""
+    role: str
+    context: Any
+    available_tools: List[str]
+    prompt: str
+    iteration_count: int = 0
+    quality_score: float = 0.0
+    last_response: Optional[str] = None
+
+
+@dataclass
+class ExecutionContext:
+    """执行上下文"""
+    workflow_id: str
+    current_role: str
+    role_index: int
+    previous_results: Dict[str, 'RoleResult']
+    handoff_context: Optional['HandoffContext']
+    isolated_context: 'IsolatedRoleContext'
+    metadata: Dict[str, Any]
+
+
+@dataclass
+class IterationResult:
+    """单轮执行结果"""
+    iteration: int
+    prompt: str
+    llm_response: str
+    tool_calls: List[Any]
+    tool_results: List[Any]
+    completion_analysis: Any
+    is_completed: bool
+    next_actions: List[str]

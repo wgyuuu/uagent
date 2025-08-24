@@ -58,3 +58,11 @@ scenes:
       temperature: 0.7
       max_tokens: 3000
       top_p: 0.9
+  
+  sub_agent:
+    model_name: "gpt-4o"
+    params:
+      temperature: 0.7
+      max_tokens: 3000
+      top_p: 0.9
+    
