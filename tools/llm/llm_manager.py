@@ -58,9 +58,9 @@ class LLMManager:
             for model_type, provider_config in self.config.models.items():
                 # 检查环境变量是否设置
                 try:
-                    api_key = provider_config.get_api_key()
+                    api_key = provider_config.api_key
                     if not api_key:
-                        logger.warning(f"跳过提供商 {model_type}，环境变量 {provider_config.api_key_env} 未设置")
+                        logger.warning(f"跳过提供商 {model_type}，API密钥未设置")
                         continue
                 except Exception as e:
                     logger.warning(f"跳过提供商 {model_type}，获取API密钥失败: {e}")
@@ -103,10 +103,10 @@ class LLMManager:
         # 根据模型名称找到对应的提供商类型
         provider_type = self.config.get_model_provider(model_name)
         if not provider_type:
-            raise ValueError(f"未找到模型 {model_name} 对应的提供商")
+            raise ValueError(f"未找到模型 {model_name} 对应的提供商, 场景: {scene_key}")
         
         if provider_type not in self.providers:
-            raise ValueError(f"未找到提供商: {provider_type}")
+            raise ValueError(f"未找到提供商: {provider_type}, 模型: {model_name}")
         
         # 获取提供商并创建LLM实例
         provider = self.providers[provider_type]

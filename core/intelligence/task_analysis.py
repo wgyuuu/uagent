@@ -6,6 +6,7 @@ UAgent Task Analysis Engine
 
 import asyncio
 import json
+import traceback
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import structlog
@@ -76,8 +77,8 @@ class TaskAnalysisEngine:
             )
             
             # 调用LLM进行分析
-            response = await self.llm.agenerate([prompt])
-            analysis_text = response.generations[0][0].text
+            response = await self.llm.ainvoke(prompt)
+            analysis_text = response.content
             
             # 解析分析结果
             analysis_result = await self._parse_analysis_response(analysis_text)
@@ -107,7 +108,7 @@ class TaskAnalysisEngine:
             
         except Exception as e:
             execution_time = (datetime.now() - start_time).total_seconds()
-            logger.error(f"任务分析失败: {task.task_id}, 错误: {e}, 耗时: {execution_time:.2f}秒")
+            logger.error(f"任务分析失败: {task.task_id}, 错误: {e}, 耗时: {execution_time:.2f}秒, 堆栈信息: {traceback.format_exc()}")
             
             # 生成备用分析
             return await self._generate_fallback_analysis(task)
@@ -230,7 +231,7 @@ class TaskAnalysisEngine:
 请以JSON格式提供分析结果，确保所有字段都有值：
 
 ```json
-{
+{{
     "primary_domain": "领域名称",
     "sub_domains": ["子领域1", "子领域2"],
     "task_type": "任务类型",
@@ -247,7 +248,7 @@ class TaskAnalysisEngine:
     "complexity_risks": ["风险1", "风险2"],
     "dependency_risks": ["风险1", "风险2"],
     "confidence_score": 0.9
-}
+}}
 ```
 
 请确保分析全面、准确，置信度分数反映分析的确定程度。
@@ -258,7 +259,7 @@ class TaskAnalysisEngine:
         return {
             "task_id": task.task_id,
             "title": task.title,
-            "domain": task.domain.value if task.domain else "unknown",
+            "domain": task.domain if task.domain else "unknown",
             "priority": task.priority,
             "requirements": task.requirements,
             "constraints": task.constraints,
@@ -583,7 +584,7 @@ class TaskAnalysisEngine:
         key_components = [
             task.title,
             task.description,
-            task.domain.value if task.domain else "unknown",
+            task.domain if task.domain else "unknown",
             str(task.priority),
             str(hash(str(task.requirements))),
             str(hash(str(task.constraints)))

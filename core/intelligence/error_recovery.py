@@ -81,8 +81,8 @@ class ErrorRecoveryController:
             )
             
             # 调用LLM进行分类
-            response = await self.llm.agenerate([prompt])
-            classification_text = response.generations[0][0].text
+            response = await self.llm.ainvoke(prompt)
+            classification_text = response.content
             
             # 解析分类结果
             classification_data = await self._parse_classification_response(classification_text)
@@ -269,7 +269,7 @@ class ErrorRecoveryController:
 请以JSON格式提供分类结果：
 
 ```json
-{
+{{
     "severity": "错误严重程度",
     "category": "错误类别",
     "recovery_feasibility": "恢复可行性",
@@ -278,7 +278,7 @@ class ErrorRecoveryController:
     "degraded_roles": ["降级的角色"],
     "confidence_score": 0.9,
     "analysis_notes": "详细分析说明"
-}
+}}
 ```
         """
     
@@ -317,9 +317,9 @@ class ErrorRecoveryController:
 请以JSON格式提供策略：
 
 ```json
-{
+{{
     "strategies": [
-        {
+        {{
             "name": "策略名称",
             "description": "策略描述",
             "action_type": "操作类型",
@@ -328,13 +328,13 @@ class ErrorRecoveryController:
             "success_probability": 0.7,
             "estimated_time": 30,
             "required_resources": ["资源1", "资源2"],
-            "parameters": {"参数": "值"},
+            "parameters": {{"参数": "值"}},
             "success_criteria": ["成功标准1", "成功标准2"]
-        }
+        }}
     ],
     "recommended_strategy": "推荐的策略名称",
     "confidence_score": 0.9
-}
+}}
 ```
         """
     
@@ -469,14 +469,14 @@ class ErrorRecoveryController:
             
             # 构建策略生成提示词
             prompt = self.strategy_prompt.format(
-                error_classification=error_classification.json(indent=2),
+                error_classification=error_classification.model_dump_json(indent=2),
                 workflow_context=json.dumps(workflow_context, indent=2, default=str),
                 dependency_impact=impact_assessment.__dict__
             )
             
             # 调用LLM生成策略
-            response = await self.llm.agenerate([prompt])
-            strategy_text = response.generations[0][0].text
+            response = await self.llm.ainvoke(prompt)
+            strategy_text = response.content
             
             # 解析策略
             strategy_data = await self._parse_strategy_response(strategy_text)

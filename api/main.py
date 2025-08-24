@@ -4,7 +4,7 @@ UAgent Main API Application
 主要的FastAPI应用入口，集成所有核心功能
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import structlog
@@ -98,6 +98,16 @@ async def initialize_core_components():
         
         logger.info("核心组件初始化完成")
         
+        # 返回初始化后的组件实例
+        return {
+            "llm_manager": llm_manager,
+            "main_agent": main_agent,
+            "workflow_engine": workflow_engine,
+            "workflow_orchestrator": workflow_orchestrator,
+            "context_manager": context_manager,
+            "tool_registry": tool_registry
+        }
+        
     except Exception as e:
         logger.error(f"核心组件初始化失败: {e}")
         raise
@@ -119,16 +129,6 @@ async def cleanup_core_components():
         
     except Exception as e:
         logger.error(f"核心组件清理失败: {e}")
-
-
-@app.get("/")
-async def root():
-    """根路径"""
-    return {
-        "message": "UAgent System v2.0.0",
-        "status": "running",
-        "description": "通用任务完成的多Agent协作系统"
-    }
 
 
 if __name__ == "__main__":

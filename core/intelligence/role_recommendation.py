@@ -11,6 +11,7 @@ from datetime import datetime
 import structlog
 from langchain.llms.base import BaseLLM
 from langchain.prompts import PromptTemplate
+import traceback
 
 from models.base import ComplexityLevel, TaskAnalysis, RoleRecommendation, ValidationResult
 from models.roles import RoleFactory, RoleCapabilities, ExpertRole
@@ -230,30 +231,30 @@ class RoleRecommendationEngine:
 请以JSON格式提供推荐结果：
 
 ```json
-{
+{{
     "recommended_sequence": ["角色1", "角色2", "角色3"],
     "mandatory_roles": ["角色1", "角色2"],
     "optional_roles": ["角色3"],
-    "reasoning": {
+    "reasoning": {{
         "角色1": "为什么需要这个角色以及为什么排在第一位",
         "角色2": "为什么需要这个角色以及它的位置",
         "角色3": "为什么这个角色能增加价值"
-    },
-    "skip_conditions": {
+    }},
+    "skip_conditions": {{
         "角色3": "什么情况下可以跳过这个角色"
-    },
-    "estimated_timeline": {
+    }},
+    "estimated_timeline": {{
         "角色1": "2-4小时",
         "角色2": "4-6小时",
         "角色3": "1-2小时"
-    },
+    }},
     "success_metrics": [
         "清晰的技术规范",
         "可工作的实现",
         "全面的测试覆盖"
     ],
     "confidence_score": 0.9
-}
+}}
 ```
 
 请提供你的推荐。
@@ -337,14 +338,14 @@ class RoleRecommendationEngine:
             
             # 构建提示词
             prompt = self.recommendation_prompt.format(
-                task_analysis=task_analysis.json(indent=2),
+                task_analysis=task_analysis.model_dump_json(indent=2),
                 available_roles=", ".join(candidate_roles),
                 role_capabilities=json.dumps(role_info, indent=2, ensure_ascii=False)
             )
             
             # 调用LLM
-            response = await self.llm.agenerate([prompt])
-            response_text = response.generations[0][0].text
+            response = await self.llm.ainvoke(prompt)
+            response_text = response.content
             
             # 解析推荐结果
             recommendation_data = await self._parse_recommendation_response(response_text)
@@ -359,7 +360,7 @@ class RoleRecommendationEngine:
             return recommendation
             
         except Exception as e:
-            logger.error(f"LLM推荐失败: {e}")
+            logger.error(f"LLM推荐失败: {e}, 堆栈信息: {traceback.format_exc()}")
             raise
     
     async def _merge_recommendations(self, 

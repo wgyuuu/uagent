@@ -1,71 +1,59 @@
 models:
   # OpenAI模型类型
   openai:
-    base_url: "https://api.openai.com/v1"
-    api_key_env: "OPENAI_API_KEY"
+    base_url: "https://llm.baifentan.com/openproxy/rp/v1"
+    api_key: "zyb-24d7f8a7703cbae1e8bb5d205d1d06f0@quickai_test"
     models:
-      - "gpt-4-turbo"
-      - "gpt-4"
-      - "gpt-3.5-turbo"
-      - "gpt-3.5-turbo-16k"
+      - "gpt-4o"
+      - "gpt-4.1-mini"
 
   # Anthropic模型类型
   anthropic:
-    base_url: "https://api.anthropic.com"
-    api_key_env: "ANTHROPIC_API_KEY"
+    base_url: "https://llm.baifentan.com/openproxy/rp/v1"
+    api_key: "zyb-24d7f8a7703cbae1e8bb5d205d1d06f0@quickai_test"
     models:
-      - "claude-3-sonnet"
-      - "claude-3-haiku"
-      - "claude-3-opus"
-
-  # 本地模型类型
-  local:
-    base_url: "http://localhost:8000"
-    api_key_env: "LOCAL_API_KEY"
-    models:
-      - "llama-2-7b"
-      - "llama-2-13b"
-      - "codellama-7b"
+      - "claude-sonnet-4-20250514"
+      - "claude-3-7-sonnet-20250219"
 
 # 场景配置
 scenes:
   task_analysis:
-    model_name: "gpt-4-turbo"
+    model_name: "gpt-4.1-mini"
     params:
       temperature: 0.3
       max_tokens: 2000
       top_p: 0.9
     
   role_recommendation:
-    model_name: "gpt-4-turbo"
+    model_name: "gpt-4.1-mini"
     params:
       temperature: 0.5
       max_tokens: 1500
       top_p: 0.95
     
   error_recovery:
-    model_name: "gpt-4-turbo"
+    model_name: "gpt-4.1-mini"
     params:
       temperature: 0.2
       max_tokens: 1000
       top_p: 0.8
     
   context_compression:
-    model_name: "gpt-3.5-turbo"
+    model_name: "gpt-4.1-mini"
     params:
       temperature: 0.4
       max_tokens: 800
       top_p: 0.9
     
   workflow_optimization:
-    model_name: "gpt-3.5-turbo"
+    model_name: "gpt-4.1-mini"
     params:
       temperature: 0.6
       max_tokens: 1200
       top_p: 0.9
       
   main_agent:
-    model_name: "gpt-4-turbo"
+    model_name: "gpt-4o"
     params:
       temperature: 0.7
       max_tokens: 3000

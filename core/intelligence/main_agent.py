@@ -5,6 +5,7 @@ UAgent Main Agent
 """
 
 import asyncio
+import traceback
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import structlog
@@ -127,7 +128,7 @@ class MainAgent:
             execution_time = (datetime.now() - start_time).total_seconds()
             await self._update_performance_metrics("analysis", execution_time, False)
             
-            logger.error(f"任务分析失败: {e}")
+            logger.error(f"任务分析失败: {e}, 堆栈信息: {traceback.format_exc()}")
             raise
 
     async def analyze_task_and_recommend_roles(self, task: Task) -> tuple[TaskAnalysis, RoleRecommendation]:
@@ -161,7 +162,7 @@ class MainAgent:
             return task_analysis, role_recommendation
             
         except Exception as e:
-            logger.error(f"任务分析和角色推荐失败: {e}")
+            logger.error(f"任务分析和角色推荐失败: {e}, 堆栈信息: {traceback.format_exc()}")
             raise
 
     async def recommend_roles(self, 
@@ -242,7 +243,7 @@ class MainAgent:
             return recommendations
             
         except Exception as e:
-            logger.error(f"角色推荐失败: {e}")
+            logger.error(f"角色推荐失败: {e}, 堆栈信息: {traceback.format_exc()}")
             # 返回默认推荐
             return [
                 {
@@ -307,7 +308,7 @@ class MainAgent:
             return recovery_decision
             
         except Exception as e:
-            logger.error(f"错误恢复处理失败: {e}")
+            logger.error(f"错误恢复处理失败: {e}, 堆栈信息: {traceback.format_exc()}")
             
             # 返回默认的手动干预决策
             return RecoveryDecision(
@@ -365,16 +366,16 @@ class MainAgent:
                 quality_metrics=str(workflow.quality_metrics)
             )
             
-            response = await self.llm.agenerate([prompt])
+            response = await self.llm.ainvoke(prompt)
             
             # 解析优化建议
-            suggestions = await self._parse_optimization_suggestions(response.generations[0][0].text)
+            suggestions = await self._parse_optimization_suggestions(response.content)
             
             logger.info(f"生成了{len(suggestions)}个优化建议")
             return suggestions
             
         except Exception as e:
-            logger.error(f"优化建议生成失败: {e}")
+            logger.error(f"优化建议生成失败: {e}, 堆栈信息: {traceback.format_exc()}")
             return []
     
     async def evaluate_task_completion(self, 
@@ -420,8 +421,8 @@ class MainAgent:
                 quality_criteria=str(workflow.task.quality_standards)
             )
             
-            response = await self.llm.agenerate([prompt])
-            evaluation = await self._parse_evaluation_result(response.generations[0][0].text)
+            response = await self.llm.ainvoke(prompt)
+            evaluation = await self._parse_evaluation_result(response.content)
             
             # 记录评估结果
             await self._record_decision("task_evaluation", {
@@ -432,7 +433,7 @@ class MainAgent:
             return evaluation
             
         except Exception as e:
-            logger.error(f"任务评估失败: {e}")
+            logger.error(f"任务评估失败: {e}, 堆栈信息: {traceback.format_exc()}")
             return {
                 "completeness": 0.5,
                 "accuracy": 0.5,
@@ -482,7 +483,7 @@ class MainAgent:
             return insights
             
         except Exception as e:
-            logger.error(f"系统洞察生成失败: {e}")
+            logger.error(f"系统洞察生成失败: {e}, 堆栈信息: {traceback.format_exc()}")
             return {"error": str(e)}
     
     # ===== 私有方法 =====

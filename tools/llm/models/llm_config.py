@@ -23,19 +23,10 @@ class ModelType(str, Enum):
 class ProviderConfig(BaseModel):
     """提供商配置"""
     base_url: str = Field(..., description="基础URL")
-    api_key_env: str = Field(..., description="API密钥环境变量名")
+    api_key: str = Field(..., description="API密钥")
     models: List[str] = Field(..., description="模型名称列表")
     
-    @field_validator('api_key_env')
-    @classmethod
-    def validate_api_key_env(cls, v):
-        # 只验证环境变量格式，不强制要求必须设置
-        # 实际使用时再检查
-        return v
-    
-    def get_api_key(self) -> str:
-        """获取API密钥"""
-        return os.getenv(self.api_key_env)
+
 
 class SceneConfig(BaseModel):
     """场景配置"""

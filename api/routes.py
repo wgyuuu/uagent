@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from typing import List, Optional, Dict, Any
 import structlog
 from pydantic import BaseModel
+import traceback
 
 from models.base import Task, WorkflowExecution, RoleResult
 from models.workflow import WorkflowDefinition, ExecutionPlan
@@ -194,7 +195,7 @@ async def recommend_roles(
         return recommendations
         
     except Exception as e:
-        logger.error(f"角色推荐失败: {e}")
+        logger.error(f"角色推荐失败: {e}, 堆栈信息: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"角色推荐失败: {str(e)}")
 
 
