@@ -214,7 +214,7 @@ class WorkflowOrchestrator:
             "workflow_id": workflow.workflow_id,
             "name": workflow.name,
             "description": workflow.description,
-            "status": workflow.status.value,
+            "status": workflow.status,
             "current_role": workflow.get_current_role(),
             "progress": f"{workflow.current_role_index}/{len(workflow.roles)}",
             "roles": workflow.roles,

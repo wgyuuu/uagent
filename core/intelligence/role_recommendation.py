@@ -76,18 +76,27 @@ class RoleRecommendationEngine:
             candidate_roles = await self._pre_filter_roles(task_analysis)
             logger.info(f"预筛选得到{len(candidate_roles)}个候选角色")
             
-            # 2. 基于模板的快速推荐
-            template_recommendation = await self._template_based_recommendation(task_analysis)
-            
-            # 3. 基于LLM的智能推荐
+            # 2. 优先使用LLM智能推荐
             llm_recommendation = await self._llm_based_recommendation(
                 task_analysis, candidate_roles
             )
             
-            # 4. 融合推荐结果
-            final_recommendation = await self._merge_recommendations(
-                template_recommendation, llm_recommendation, task_analysis
-            )
+            # 3. 检查LLM推荐是否有效，无效时使用模板推荐作为兜底
+            if await self._is_llm_recommendation_valid(llm_recommendation):
+                final_recommendation = llm_recommendation
+                logger.info("使用LLM推荐结果")
+            else:
+                # 4. LLM推荐无效时，使用模板推荐作为兜底
+                logger.warning("LLM推荐无效，使用模板推荐作为兜底")
+                template_recommendation = await self._template_based_recommendation(task_analysis)
+                
+                if template_recommendation:
+                    final_recommendation = template_recommendation
+                    logger.info("使用模板推荐结果")
+                else:
+                    # 5. 双重兜底：生成备用推荐
+                    logger.warning("模板推荐也失败，使用备用推荐")
+                    final_recommendation = await self._generate_fallback_recommendation(task_analysis)
             
             # 5. 验证推荐结果
             validation_result = await self._validate_recommendation(
@@ -303,6 +312,7 @@ class RoleRecommendationEngine:
             template = templates.get(domain)
             
             if template and template.is_applicable(task_analysis):
+                logger.info(f"使用模板推荐: {template.role_sequence}")
                 return RoleRecommendation(
                     task_id=task_analysis.task_id,
                     recommended_sequence=template.role_sequence,
@@ -314,12 +324,51 @@ class RoleRecommendationEngine:
                     recommendation_method="template_based"
                 )
             
+            logger.info("没有找到适用的工作流模板")
             return None
             
         except Exception as e:
             logger.warning(f"模板推荐失败: {e}")
             return None
     
+    async def _is_llm_recommendation_valid(self, recommendation: RoleRecommendation) -> bool:
+        """检测LLM推荐结果是否有效"""
+        try:
+            # 检查推荐序列不为空
+            if not recommendation.recommended_sequence:
+                logger.warning("LLM推荐序列为空")
+                return False
+            
+            # 检查置信度是否合理
+            if recommendation.confidence_score < 0.3:
+                logger.warning(f"LLM推荐置信度过低: {recommendation.confidence_score}")
+                return False
+            
+            # 检查推荐方法标识
+            if recommendation.recommendation_method != "llm_based":
+                logger.warning(f"LLM推荐方法标识错误: {recommendation.recommendation_method}")
+                return False
+            
+            # 检查必需角色是否在推荐序列中
+            for mandatory_role in recommendation.mandatory_roles:
+                if mandatory_role not in recommendation.recommended_sequence:
+                    logger.warning(f"必需角色不在推荐序列中: {mandatory_role}")
+                    return False
+            
+            # 检查角色是否存在
+            available_roles = self.role_factory.get_available_roles()
+            for role in recommendation.recommended_sequence:
+                if role not in available_roles:
+                    logger.warning(f"推荐的角色不存在: {role}")
+                    return False
+            
+            logger.info("LLM推荐结果验证通过")
+            return True
+            
+        except Exception as e:
+            logger.error(f"LLM推荐验证异常: {e}")
+            return False
+
     async def _llm_based_recommendation(self, 
                                       task_analysis: TaskAnalysis,
                                       candidate_roles: List[str]) -> RoleRecommendation:
@@ -350,6 +399,11 @@ class RoleRecommendationEngine:
             # 解析推荐结果
             recommendation_data = await self._parse_recommendation_response(response_text)
             
+            # 验证解析结果
+            if not recommendation_data or "recommended_sequence" not in recommendation_data:
+                logger.error("LLM响应解析失败，推荐数据不完整")
+                raise ValueError("LLM推荐数据不完整")
+            
             # 创建推荐对象
             recommendation = RoleRecommendation(
                 task_id=task_analysis.task_id,
@@ -357,91 +411,26 @@ class RoleRecommendationEngine:
                 **recommendation_data
             )
             
+            logger.info(f"LLM推荐成功: {recommendation.recommended_sequence}")
             return recommendation
             
         except Exception as e:
             logger.error(f"LLM推荐失败: {e}, 堆栈信息: {traceback.format_exc()}")
-            raise
-    
-    async def _merge_recommendations(self, 
-                                   template_rec: Optional[RoleRecommendation],
-                                   llm_rec: RoleRecommendation,
-                                   task_analysis: TaskAnalysis) -> RoleRecommendation:
-        """融合推荐结果"""
-        try:
-            # 如果没有模板推荐，直接使用LLM推荐
-            if not template_rec:
-                return llm_rec
-            
-            # 融合推荐序列
-            merged_sequence = self._merge_role_sequences(
-                template_rec.recommended_sequence,
-                llm_rec.recommended_sequence
-            )
-            
-            # 融合必需角色
-            merged_mandatory = list(set(
-                template_rec.mandatory_roles + llm_rec.mandatory_roles
-            ))
-            
-            # 融合可选角色
-            merged_optional = list(set(
-                template_rec.optional_roles + llm_rec.optional_roles
-            ))
-            
-            # 融合推理
-            merged_reasoning = {**template_rec.reasoning, **llm_rec.reasoning}
-            
-            # 融合成功指标
-            merged_success_metrics = list(set(
-                template_rec.success_metrics + llm_rec.success_metrics
-            ))
-            
-            # 计算置信度（取平均值）
-            merged_confidence = (template_rec.confidence_score + llm_rec.confidence_score) / 2
-            
+            # 返回一个标记为无效的推荐对象，让调用方知道需要兜底
             return RoleRecommendation(
                 task_id=task_analysis.task_id,
-                recommended_sequence=merged_sequence,
-                mandatory_roles=merged_mandatory,
-                optional_roles=merged_optional,
-                reasoning=merged_reasoning,
-                success_metrics=merged_success_metrics,
-                confidence_score=merged_confidence,
-                recommendation_method="merged"
+                recommended_sequence=[],
+                mandatory_roles=[],
+                optional_roles=[],
+                reasoning={},
+                success_metrics=[],
+                confidence_score=0.0,
+                recommendation_method="llm_based"
             )
-            
-        except Exception as e:
-            logger.error(f"推荐融合失败: {e}")
-            return llm_rec  # 返回LLM推荐作为备用
     
-    def _merge_role_sequences(self, seq1: List[str], seq2: List[str]) -> List[str]:
-        """融合角色序列"""
-        # 简单策略：保持依赖关系的前提下，优先使用LLM推荐的序列
-        # 这里可以实现更复杂的融合逻辑
-        
-        # 确保关键依赖关系
-        merged = seq2.copy()
-        
-        # 确保方案规划师在编码专家之前（如果两者都存在）
-        if "方案规划师" in merged and "编码专家" in merged:
-            planner_idx = merged.index("方案规划师")
-            coder_idx = merged.index("编码专家")
-            
-            if planner_idx > coder_idx:
-                merged.remove("方案规划师")
-                merged.insert(coder_idx, "方案规划师")
-        
-        # 确保编码专家在测试工程师之前
-        if "编码专家" in merged and "测试工程师" in merged:
-            coder_idx = merged.index("编码专家")
-            tester_idx = merged.index("测试工程师")
-            
-            if coder_idx > tester_idx:
-                merged.remove("编码专家")
-                merged.insert(tester_idx, "编码专家")
-        
-        return merged
+
+    
+
     
     async def _calculate_single_role_fit(self, role_name: str, task_analysis: TaskAnalysis) -> float:
         """计算单个角色的匹配分数"""

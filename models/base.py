@@ -321,7 +321,7 @@ class HandoffContext(BaseModel):
     
     # 交接内容
     deliverables: Dict[str, Any] = Field(default_factory=dict, description="交付物")
-    requirements: List[str] = Field(default_factory=list, description="需求和约束")
+    requirements: Dict[str, Any] = Field(default_factory=dict, description="需求和约束")
     technical_context: Dict[str, Any] = Field(default_factory=dict, description="技术上下文")
     
     # 指导信息
@@ -437,6 +437,9 @@ class ErrorClassification(BaseModel):
     category: str = Field(..., description="错误类别")
     recovery_feasibility: str = Field(..., description="恢复可行性")
     workflow_impact: str = Field(..., description="工作流影响")
+    
+    # 错误修复适用性
+    error_recovery_applicable: str = Field(..., description="错误修复适用性")
     
     # 影响分析
     blocked_roles: List[str] = Field(default_factory=list, description="被阻塞角色")
