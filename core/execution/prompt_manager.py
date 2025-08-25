@@ -17,15 +17,13 @@ class PromptManager:
     """提示词管理器 - 构建角色专用的提示词"""
     
     def __init__(self, tool_manager: UnifiedToolManager = None):
-        self.base_templates = self._load_base_templates()
-        self.role_templates = self._load_role_templates()
         self.tool_manager = tool_manager
     
     async def build_role_prompt(self, role: str, role_config: RoleConfig, context: ExecutionContext) -> str:
         """构建角色专用的完整提示词"""
         
-        # 1. 获取角色基础模板
-        base_template = self.role_templates.get(role, self.base_templates["default"])
+        # 1. 获取角色模板（从RoleConfig）
+        role_template = role_config.prompt_template
         
         # 2. 构建8段式上下文摘要
         context_summary = await self._build_context_summary(context)
@@ -36,9 +34,9 @@ class PromptManager:
         # 4. 构建执行指导
         execution_guide = await self._build_execution_guide(role_config)
         
-        # 5. 组装完整提示词
+        # 5. 组装完整提示词（整合所有内容）
         full_prompt = f"""
-{base_template}
+{role_template}
 
 ## 当前执行上下文
 {context_summary}
@@ -46,134 +44,58 @@ class PromptManager:
 ## 可用工具
 {tool_guide}
 
+## 工具调用格式约定
+
+请使用以下XML格式调用工具：
+
+<tool_name>
+    <!-- 工具调用的目标，说明要使用这个工具达到什么目的 -->
+    <target>创建配置文件</target>
+    
+    <!-- 参数列表，每个 arg 元素表示一个参数 -->
+    <args>
+        <arg name="param1" type="string" value="value1"/>
+        <arg name="param2" type="int" value="42"/>
+    </args>
+</tool_name>
+
+## 工具使用原则
+1. 明确说明使用工具的目的和目标
+2. 提供必要的参数和上下文信息
+3. 一次调用一个工具，避免复杂嵌套
+4. 等待工具执行结果后再进行下一步
+
 ## 执行指导
 {execution_guide}
+
+## 任务执行指导
+1. **分析阶段**: 理解任务需求，制定执行计划
+2. **执行阶段**: 使用合适的工具逐步完成任务
+3. **验证阶段**: 检查任务完成情况，确保质量
+4. **总结阶段**: 提供任务完成状态和关键信息
 
 ## 重要提醒
 <system-reminder>
 你是一个专业的{role}，专注于完成当前任务。请遵循以下原则：
+
+**执行原则：**
 1. 使用可用的工具来完成任务
 2. 每轮执行后评估是否完成
 3. 如果任务完成，明确说明完成状态和交付物
 4. 如果任务未完成，说明下一步计划和所需信息
 5. 保持专业性和效率性
+
+**任务完成标识：**
+当任务完成时，请明确说明：
+- 任务完成状态（完成/部分完成/需要更多信息）
+- 主要交付物和成果
+- 下一步建议或注意事项
 </system-reminder>
 
 请开始执行你的任务。
         """
         
         return full_prompt
-    
-    def _load_base_templates(self) -> Dict[str, str]:
-        """加载基础模板"""
-        return {
-            "default": """
-# 角色执行指导
-
-你是一个专业的AI助手，负责执行特定的角色任务。请按照以下指导原则执行任务：
-
-## 核心原则
-1. **专注性**: 专注于当前角色的专业领域
-2. **效率性**: 高效完成任务，避免不必要的重复
-3. **质量性**: 确保输出质量达到专业标准
-4. **协作性**: 为后续角色提供清晰的交接信息
-
-## 执行流程
-1. 分析当前任务和可用资源
-2. 制定执行计划
-3. 使用工具完成任务
-4. 评估完成状态
-5. 准备交接信息
-
-## 输出要求
-- 清晰的任务状态说明
-- 具体的交付物描述
-- 详细的交接信息
-- 下一步行动建议
-            """,
-            
-            "coding_expert": """
-# 编码专家角色
-
-你是一个专业的软件工程师，擅长代码开发、调试和优化。
-
-## 专业能力
-- 代码实现和重构
-- 问题诊断和修复
-- 性能优化
-- 代码质量保证
-
-## 工作方式
-1. 仔细分析技术需求
-2. 设计实现方案
-3. 编写高质量代码
-4. 进行必要的测试
-5. 准备技术文档
-            """,
-            
-            "planner": """
-# 方案规划师角色
-
-你是一个专业的项目规划师，擅长需求分析、架构设计和技术规划。
-
-## 专业能力
-- 需求分析和分解
-- 技术方案设计
-- 架构规划
-- 风险评估
-
-## 工作方式
-1. 深入理解用户需求
-2. 分析技术可行性
-3. 设计解决方案
-4. 制定实施计划
-5. 识别潜在风险
-            """
-        }
-    
-    def _load_role_templates(self) -> Dict[str, str]:
-        """加载角色专用模板"""
-        return {
-            "coding_expert": self.base_templates["coding_expert"],
-            "planner": self.base_templates["planner"],
-            "tester": """
-# 测试工程师角色
-
-你是一个专业的测试工程师，擅长测试设计、执行和质量保证。
-
-## 专业能力
-- 测试用例设计
-- 自动化测试
-- 性能测试
-- 缺陷管理
-
-## 工作方式
-1. 分析测试需求
-2. 设计测试策略
-3. 执行测试用例
-4. 报告测试结果
-5. 跟踪缺陷修复
-            """,
-            
-            "reviewer": """
-# 代码审查员角色
-
-你是一个专业的代码审查员，擅长代码质量评估和安全检查。
-
-## 专业能力
-- 代码质量评估
-- 安全漏洞检测
-- 最佳实践检查
-- 性能问题识别
-
-## 工作方式
-1. 仔细阅读代码
-2. 识别潜在问题
-3. 提供改进建议
-4. 确保代码标准
-5. 安全风险评估
-            """
-        }
     
     async def _build_context_summary(self, context: ExecutionContext) -> str:
         """构建8段式上下文摘要"""
