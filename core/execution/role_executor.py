@@ -23,6 +23,7 @@ from models.base import (
     IterationResult
 )
 from models.roles import RoleConfig, RoleFactory
+from utils.common import get_attr
 from .agent_runner import AgentRunner
 from .execution_controller import ExecutionController
 from .result_synthesizer import ResultSynthesizer
@@ -191,12 +192,12 @@ class RoleExecutor:
                 "execution_time": execution_time
             },
             deliverables={
-                "summary": final_result.get("summary", ""),
-                "key_information": final_result.get("key_information", {}),
-                "deliverables": final_result.get("deliverables", {})
+                "summary": get_attr(final_result, "summary", ""),
+                "key_information": get_attr(final_result, "key_information", {}),
+                "deliverables": get_attr(final_result, "deliverables", {})
             },
-            quality_score=final_result.get("quality_score", 0.8),
-            completeness_score=final_result.get("completeness_score", 0.9)
+            quality_score=get_attr(final_result, "quality_score", 0.8),
+            completeness_score=get_attr(final_result, "completeness_score", 0.9)
         )
     
     async def _handle_execution_error(self, 
