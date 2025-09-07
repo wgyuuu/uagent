@@ -426,14 +426,8 @@ class WaterfallWorkflowEngine:
                 quality_threshold=0.85
             )
             
-            # 创建统一工具管理器
-            tool_manager = ToolManager()
-            
             # 创建角色执行器实例
-            role_executor = RoleExecutor(
-                tool_manager=tool_manager,  # 使用新的工具管理器
-                execution_config=execution_config
-            )
+            role_executor = RoleExecutor(execution_config=execution_config)
             
             # 执行角色任务
             return await role_executor.execute_role(role, context)

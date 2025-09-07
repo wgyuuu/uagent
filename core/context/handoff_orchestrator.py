@@ -35,7 +35,6 @@ class HandoffResponse:
     status: str  # "accepted", "rejected", "pending"
     message: str
     context_validation: Dict[str, Any]
-    estimated_processing_time: Optional[int] = None
 
 
 class HandoffOrchestrator:
@@ -175,8 +174,7 @@ class HandoffOrchestrator:
         handoff_id: str,
         to_role_id: str,
         acceptance: bool = True,
-        feedback: Optional[str] = None,
-        estimated_time: Optional[int] = None
+        feedback: Optional[str] = None
     ) -> HandoffResponse:
         """
         处理交接请求
@@ -186,7 +184,6 @@ class HandoffOrchestrator:
             to_role_id: 接收角色ID
             acceptance: 是否接受
             feedback: 反馈信息
-            estimated_time: 预计处理时间
             
         Returns:
             交接响应对象
@@ -212,8 +209,7 @@ class HandoffOrchestrator:
                 handoff_id=handoff_id,
                 status=status,
                 message=feedback or f"交接{'接受' if status == 'accepted' else '拒绝'}",
-                context_validation=validation_result,
-                estimated_processing_time=estimated_time
+                context_validation=validation_result
             )
             
             # 更新交接状态

@@ -166,7 +166,6 @@ class PromptManager:
 - **角色名称**: {role_config.name}
 - **专业领域**: {role_config.category}
 - **专家级别**: {role_config.expert_level}
-- **最大执行时间**: {role_config.max_execution_time} 秒
 
 ## 执行要求
 """

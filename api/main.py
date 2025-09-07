@@ -71,7 +71,7 @@ async def initialize_core_components():
         logger.info("LLM管理器初始化完成")
         
         # 初始化工具管理器
-        init_tool()
+        await init_tool()
         logger.info("工具管理器初始化完成")
         
         logger.info("核心组件初始化完成")

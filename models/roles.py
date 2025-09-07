@@ -94,7 +94,6 @@ class RoleConfig(BaseModel):
     behavior_rules: List[str] = Field(default_factory=list, description="行为规则")
     
     # 执行配置
-    max_execution_time: int = Field(default=3600, description="最大执行时间(秒)")
     retry_attempts: int = Field(default=3, description="重试次数")
     resource_limits: Dict[str, Any] = Field(default_factory=dict, description="资源限制")
     

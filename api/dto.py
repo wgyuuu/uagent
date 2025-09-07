@@ -11,7 +11,6 @@ class APIRoleRecommendation(BaseModel):
     capabilities: List[str]
     confidence_score: float = 0.8
     reasoning: str = ""
-    estimated_time: str = "2-4小时"
 
 # 请求/响应模型
 class CreateTaskRequest(BaseModel):

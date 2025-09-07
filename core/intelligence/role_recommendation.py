@@ -249,11 +249,6 @@ class RoleRecommendationEngine:
     "skip_conditions": {{
         "角色3": "什么情况下可以跳过这个角色"
     }},
-    "estimated_timeline": {{
-        "角色1": "2-4小时",
-        "角色2": "4-6小时",
-        "角色3": "1-2小时"
-    }},
     "success_metrics": [
         "清晰的技术规范",
         "可工作的实现",
@@ -264,7 +259,7 @@ class RoleRecommendationEngine:
 ```
 
 请提供你的推荐。
-        """
+"""
     
     async def _pre_filter_roles(self, task_analysis: TaskAnalysis) -> List[str]:
         """基于规则预筛选角色"""
@@ -502,10 +497,6 @@ class RoleRecommendationEngine:
                 "编码专家": "需要实现具体功能"
             },
             "skip_conditions": {},
-            "estimated_timeline": {
-                "方案规划师": "2-3小时",
-                "编码专家": "4-6小时"
-            },
             "success_metrics": ["功能实现", "质量达标"],
             "confidence_score": 0.5
         }
@@ -518,7 +509,6 @@ class RoleRecommendationEngine:
             "optional_roles": [],
             "reasoning": {"编码专家": "默认推荐"},
             "skip_conditions": {},
-            "estimated_timeline": {"编码专家": "2-4小时"},
             "success_metrics": ["任务完成"],
             "confidence_score": 0.5
         }

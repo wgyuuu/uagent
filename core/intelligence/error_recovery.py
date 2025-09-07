@@ -368,7 +368,6 @@ class ErrorRecoveryController:
             "feasibility_score": 0.8,
             "risk_level": "风险级别",
             "success_probability": 0.7,
-            "estimated_time": 30,
             "required_resources": ["资源1", "资源2"],
             "parameters": {{"参数": "值"}},
             "success_criteria": ["成功标准1", "成功标准2"]
@@ -476,7 +475,6 @@ class ErrorRecoveryController:
                 feasibility_score=0.7 if error_classification.recovery_feasibility == "easily_recoverable" else 0.5,
                 risk_level="low" if error_classification.severity in ["minor", "trivial"] else "medium",
                 success_probability=0.6,
-                estimated_time=15,
                 required_resources=["compute"],
                 parameters={"retry_count": 1, "delay_seconds": 5},
                 success_criteria=["角色执行成功", "无新错误产生"]
@@ -492,7 +490,6 @@ class ErrorRecoveryController:
                 feasibility_score=0.8,
                 risk_level="medium",
                 success_probability=0.7,
-                estimated_time=1,
                 required_resources=[],
                 parameters={"skip_role": error_classification.failed_role},
                 success_criteria=["工作流继续执行", "后续角色正常运行"]
@@ -507,7 +504,6 @@ class ErrorRecoveryController:
             feasibility_score=0.9,
             risk_level="low",
             success_probability=0.8,
-            estimated_time=60,  # 假设1小时人工处理
             required_resources=["human_operator"],
             parameters={"intervention_type": "error_resolution"},
             success_criteria=["问题得到解决", "工作流可以继续"]
@@ -617,10 +613,9 @@ class ErrorRecoveryController:
         # 计算策略综合分数
         def calculate_score(strategy: RecoveryStrategy) -> float:
             return (
-                strategy.feasibility_score * 0.4 +
+                strategy.feasibility_score * 0.5 +
                 strategy.success_probability * 0.3 +
-                (1.0 - {"low": 0.1, "medium": 0.5, "high": 0.9}.get(strategy.risk_level, 0.5)) * 0.2 +
-                (1.0 - strategy.estimated_time / 120.0) * 0.1  # 时间因子，120分钟为基准
+                (1.0 - {"low": 0.1, "medium": 0.5, "high": 0.9}.get(strategy.risk_level, 0.5)) * 0.2
             )
         
         # 选择得分最高的策略
@@ -664,7 +659,6 @@ class ErrorRecoveryController:
                 feasibility_score=0.9,
                 risk_level="low",
                 success_probability=0.8,
-                estimated_time=60,
                 required_resources=["human_operator"],
                 success_criteria=["问题解决", "工作流恢复"]
             )
@@ -679,7 +673,6 @@ class ErrorRecoveryController:
                 feasibility_score=0.6,
                 risk_level="medium",
                 success_probability=0.5,
-                estimated_time=15,
                 required_resources=["compute"],
                 success_criteria=["重试成功"]
             )

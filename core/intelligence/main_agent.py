@@ -233,8 +233,7 @@ class MainAgent:
                     "domain": domain,
                     "capabilities": [str(domain) for domain in role.config.capabilities.primary_domains] if role else [f"{role_name}相关能力"],
                     "confidence_score": role_recommendation.confidence_score,
-                    "reasoning": role_recommendation.reasoning.get(role_name, f"推荐{role_name}角色"),
-                    "estimated_time": role_recommendation.estimated_timeline.get(role_name, "2-4小时")
+                    "reasoning": role_recommendation.reasoning.get(role_name, f"推荐{role_name}角色")
                 }
                 recommendations.append(recommendation)
             
@@ -252,8 +251,7 @@ class MainAgent:
                     "domain": domain,
                     "capabilities": ["代码编写", "算法实现"],
                     "confidence_score": 0.5,
-                    "reasoning": "默认推荐编码专家",
-                    "estimated_time": "2-4小时"
+                    "reasoning": "默认推荐编码专家"
                 }
             ]
     

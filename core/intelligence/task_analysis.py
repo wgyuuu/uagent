@@ -251,7 +251,7 @@ class TaskAnalysisEngine:
 ```
 
 请确保分析全面、准确，置信度分数反映分析的确定程度。
-        """
+"""
     
     async def _prepare_task_context(self, task: Task) -> Dict[str, Any]:
         """准备任务上下文"""

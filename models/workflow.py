@@ -369,7 +369,6 @@ class ExecutionPlan(BaseModel):
     
     # 计划信息
     planned_steps: List[WorkflowStep] = Field(..., description="计划步骤")
-    estimated_total_time: int = Field(..., description="预估总时间(分钟)")
     
     # 资源规划
     required_resources: Dict[str, Any] = Field(default_factory=dict, description="所需资源")
@@ -478,7 +477,6 @@ class WorkflowOptimizationSuggestion(BaseModel):
     # 实施信息
     implementation_steps: List[str] = Field(default_factory=list, description="实施步骤")
     required_resources: List[str] = Field(default_factory=list, description="所需资源")
-    estimated_time: int = Field(..., description="预估实施时间(小时)")
     
     # 验证标准
     success_metrics: List[str] = Field(default_factory=list, description="成功指标")

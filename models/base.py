@@ -183,9 +183,6 @@ class RoleRecommendation(BaseModel):
     reasoning: Dict[str, str] = Field(default_factory=dict, description="推荐理由")
     skip_conditions: Dict[str, str] = Field(default_factory=dict, description="跳过条件")
     
-    # 时间估算
-    estimated_timeline: Dict[str, str] = Field(default_factory=dict, description="时间估算")
-    total_estimated_time: Optional[int] = Field(None, description="总预估时间(分钟)")
     
     # 成功指标
     success_metrics: List[str] = Field(default_factory=list, description="成功指标")
@@ -465,7 +462,6 @@ class RecoveryStrategy(BaseModel):
     success_probability: float = Field(..., ge=0.0, le=1.0, description="成功概率")
     
     # 资源需求
-    estimated_time: int = Field(..., description="预估时间(分钟)")
     required_resources: List[str] = Field(default_factory=list, description="所需资源")
     
     # 执行参数

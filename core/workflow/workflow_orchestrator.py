@@ -451,30 +451,11 @@ class WorkflowOrchestrator:
     async def _create_execution_plan(self, workflow_definition: WorkflowDefinition) -> Optional[ExecutionPlan]:
         """创建执行计划"""
         try:
-            # 估算执行时间
-            estimated_time = 0
-            for role in workflow_definition.roles:
-                # 基于角色的简单时间估算
-                role_time_map = {
-                    "方案规划师": 60,
-                    "编码专家": 180,
-                    "测试工程师": 90,
-                    "代码审查员": 45,
-                    "数据分析师": 120,
-                    "股票分析师": 90,
-                    "技术写作专家": 75,
-                    "调研分析师": 105,
-                    "文档阅读专家": 45,
-                    "知识整理专家": 60
-                }
-                estimated_time += role_time_map.get(role, 60)
-            
             # 创建执行计划
             plan = ExecutionPlan(
                 plan_id=f"plan_{generate_id()}",
                 workflow_id=workflow_definition.workflow_id,
                 planned_steps=[],  # 这里应该创建具体的步骤
-                estimated_total_time=estimated_time,
                 created_by="orchestrator"
             )
             

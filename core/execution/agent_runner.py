@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any, AsyncGenerator
 from dataclasses import dataclass
 import structlog
 
-from core.execution.mcptools import ToolManager
+from core.execution.mcptools import get_tool_manager
 from tools.llm.llm_manager import LLMManager
 
 from .role_executor import AgentEnvironment, IterationResult
@@ -44,13 +44,13 @@ class CompletionAnalysis:
 class AgentRunner:
     """Agent运行引擎 - 管理单轮Agent推理和执行"""
     
-    def __init__(self, tool_manager: ToolManager):
+    def __init__(self):
         # LLM实例
         from tools.llm import get_llm_for_scene
         self.llm = get_llm_for_scene("sub_agent")
         
         # 工具管理器
-        self.tool_manager = tool_manager
+        self.tool_manager = get_tool_manager()
         
         # 工具执行统计
         self.tool_execution_stats = {
@@ -67,12 +67,8 @@ class AgentRunner:
         try:
             logger.info(f"开始第 {iteration} 轮Agent推理")
             
-            # 1. 构建当前轮次的提示词
-            current_prompt = await self._build_iteration_prompt(agent_env, iteration)
-            
-            # 2. 调用LLM进行推理
-            # 构建完整的提示词
-            full_prompt = self._build_full_prompt(current_prompt, agent_env)
+            # 统一构建完整的提示词（替代原来的两步构建）
+            full_prompt = await self._build_unified_prompt(agent_env, iteration)
             
             # 异步调用LLM
             llm_result = await self.llm.ainvoke(full_prompt)
@@ -92,7 +88,7 @@ class AgentRunner:
             # 6. 生成迭代结果
             iteration_result = IterationResult(
                 iteration=iteration,
-                prompt=current_prompt,
+                prompt=full_prompt,
                 llm_response=llm_response,
                 tool_calls=tool_calls,
                 tool_results=tool_results,
@@ -108,55 +104,54 @@ class AgentRunner:
             logger.error(f"Agent迭代 {iteration} 执行失败: {e}")
             return await self._handle_iteration_error(iteration, e)
     
-    async def _build_iteration_prompt(self, agent_env: AgentEnvironment, iteration: int) -> str:
-        """构建当前轮次的提示词"""
+    async def _build_unified_prompt(self, agent_env: AgentEnvironment, iteration: int) -> str:
+        """统一的prompt构建方法 - 替代原来的两个函数，避免信息重复"""
         
-        # 基础提示词
+        # 1. 基础角色提示词
         base_prompt = agent_env.prompt
         
-        # 添加迭代信息
-        iteration_info = f"""
-## 当前执行状态
-- 执行轮次: 第 {iteration} 轮
-- 可用工具: {', '.join(agent_env.available_tools)}
-- 上下文大小: {len(str(agent_env.context))} 字符
-
-## 执行指导
-请基于当前上下文和可用工具，执行你的任务。如果任务完成，请明确说明完成状态和交付物。
-如果任务未完成，请说明下一步计划和所需信息。
-
-请开始执行。
-        """
+        # 2. 异步获取详细工具信息（使用现有的异步方法）
+        tools_section = await self._build_tools_info_async(agent_env.available_tools)
         
-        return base_prompt + iteration_info
-    
-    def _build_full_prompt(self, base_prompt: str, agent_env: AgentEnvironment) -> str:
-        """构建完整的提示词，包含上下文和工具信息"""
+        # 3. 构建上下文信息
+        context_section = self._build_context_summary(agent_env.context)
         
-        # 构建上下文摘要
-        context_summary = self._build_context_summary(agent_env.context)
+        # 4. 构建迭代状态信息（不包含重复的工具和上下文信息）
+        iteration_section = self._build_iteration_status(iteration, agent_env)
         
-        # 构建工具信息
-        tools_info = self._build_tools_info(agent_env.available_tools)
-        
-        # 组装完整提示词
-        full_prompt = f"""
+        # 5. 统一组装（避免重复）
+        unified_prompt = f"""
 {base_prompt}
 
+## 执行状态
+{iteration_section}
+
 ## 执行上下文
-{context_summary}
+{context_section}
 
 ## 可用工具
-{tools_info}
+{tools_section}
 
-## 重要提醒
-请使用可用的工具来完成任务，并在响应中明确说明：
-1. 你计划使用哪些工具
-2. 每个工具的具体用途
-3. 执行结果和下一步计划
-        """
+## 执行指导
+基于以上信息，请执行你的任务：
+1. 分析当前状态和可用资源
+2. 选择合适的工具完成任务
+3. 明确说明执行结果和下一步计划
+4. 如果任务完成，请提供完成状态和交付物
+
+请开始执行。
+"""
         
-        return full_prompt
+        return unified_prompt.strip()
+    
+    def _build_iteration_status(self, iteration: int, agent_env: AgentEnvironment) -> str:
+        """构建迭代状态信息（不包含重复的工具和上下文信息）"""
+        return f"""
+- 执行轮次: 第 {iteration} 轮
+- 当前角色: {agent_env.role}
+- 迭代计数: {agent_env.iteration_count}
+- 质量评分: {agent_env.quality_score:.2f}
+""".strip()
     
     def _build_context_summary(self, context: Any) -> str:
         """构建上下文摘要"""
@@ -171,8 +166,9 @@ class AgentRunner:
                 if hasattr(isolated, 'sections'):
                     sections = isolated.sections
                     summary = []
-                    for section_name, content in sections.items():
-                        if content and content.strip():
+                    for section_name, section_obj in sections.items():
+                        if section_obj and hasattr(section_obj, 'content') and section_obj.content.strip():
+                            content = section_obj.content
                             summary.append(f"### {section_name}\n{content[:200]}{'...' if len(content) > 200 else ''}")
                     return "\n\n".join(summary)
             
@@ -182,20 +178,6 @@ class AgentRunner:
             
         except Exception as e:
             return f"上下文解析失败: {str(e)}"
-    
-    def _build_tools_info(self, available_tools: List[str]) -> str:
-        """构建工具信息"""
-        
-        if not available_tools:
-            return "当前没有可用的工具"
-        
-        tools_info = []
-        
-        # 使用简化的工具信息构建（在异步上下文中应该使用 _build_tools_info_async）
-        for tool in available_tools:
-            tools_info.append(f"- **{tool}**: 可用工具，支持相关操作")
-        
-        return "\n".join(tools_info)
     
     async def _build_tools_info_async(self, available_tools: List[str]) -> str:
         """异步构建工具信息（详细版本）"""
