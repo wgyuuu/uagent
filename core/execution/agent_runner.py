@@ -11,6 +11,8 @@ import structlog
 
 from core.execution.mcptools import get_tool_manager
 from tools.llm.llm_manager import LLMManager
+from core.prompt_manager import create_prompt_manager, create_build_request
+from models.base import ExecutionState
 
 from .role_executor import AgentEnvironment, IterationResult
 
@@ -52,6 +54,9 @@ class AgentRunner:
         # 工具管理器
         self.tool_manager = get_tool_manager()
         
+        # 使用独立的prompt管理器
+        self.prompt_manager = create_prompt_manager()
+        
         # 工具执行统计
         self.tool_execution_stats = {
             "total_calls": 0,
@@ -67,8 +72,8 @@ class AgentRunner:
         try:
             logger.info(f"开始第 {iteration} 轮Agent推理")
             
-            # 统一构建完整的提示词（替代原来的两步构建）
-            full_prompt = await self._build_unified_prompt(agent_env, iteration)
+            # 使用独立prompt管理器构建完整提示词
+            full_prompt = await self._build_prompt_with_manager(agent_env, iteration)
             
             # 异步调用LLM
             llm_result = await self.llm.ainvoke(full_prompt)
@@ -104,104 +109,64 @@ class AgentRunner:
             logger.error(f"Agent迭代 {iteration} 执行失败: {e}")
             return await self._handle_iteration_error(iteration, e)
     
-    async def _build_unified_prompt(self, agent_env: AgentEnvironment, iteration: int) -> str:
-        """统一的prompt构建方法 - 替代原来的两个函数，避免信息重复"""
+    async def _build_prompt_with_manager(self, agent_env: AgentEnvironment, iteration: int) -> str:
+        """使用独立prompt管理器构建完整提示词"""
         
-        # 1. 基础角色提示词
-        base_prompt = agent_env.prompt
-        
-        # 2. 异步获取详细工具信息（使用现有的异步方法）
-        tools_section = await self._build_tools_info_async(agent_env.available_tools)
-        
-        # 3. 构建上下文信息
-        context_section = self._build_context_summary(agent_env.context)
-        
-        # 4. 构建迭代状态信息（不包含重复的工具和上下文信息）
-        iteration_section = self._build_iteration_status(iteration, agent_env)
-        
-        # 5. 统一组装（避免重复）
-        unified_prompt = f"""
-{base_prompt}
-
-## 执行状态
-{iteration_section}
-
-## 执行上下文
-{context_section}
-
-## 可用工具
-{tools_section}
-
-## 执行指导
-基于以上信息，请执行你的任务：
-1. 分析当前状态和可用资源
-2. 选择合适的工具完成任务
-3. 明确说明执行结果和下一步计划
-4. 如果任务完成，请提供完成状态和交付物
-
-请开始执行。
-"""
-        
-        return unified_prompt.strip()
+        try:
+            # 构建执行状态
+            execution_state = ExecutionState(
+                iteration=iteration,
+                role=agent_env.role,
+                iteration_count=agent_env.iteration_count,
+                quality_score=agent_env.quality_score,
+                last_response=getattr(agent_env, 'last_response', None),
+                tool_execution_stats=self.get_tool_execution_stats(),
+                successful_tool_calls=self.tool_execution_stats.get('successful_calls', 0),
+                failed_tool_calls=self.tool_execution_stats.get('failed_calls', 0)
+            )
+            
+            # 创建prompt构建请求
+            build_request = create_build_request(
+                role=agent_env.role,
+                role_config=getattr(agent_env, 'role_config', None),
+                context=agent_env.context,
+                execution_state=execution_state,
+                available_tools=agent_env.available_tools
+            )
+            
+            # 使用prompt管理器构建完整prompt
+            full_prompt = await self.prompt_manager.build_complete_prompt(build_request)
+            
+            logger.debug(f"使用prompt管理器构建prompt完成，长度: {len(full_prompt)}")
+            return full_prompt
+            
+        except Exception as e:
+            logger.error(f"使用prompt管理器构建prompt失败: {e}")
+            # 降级到基础prompt
+            return await self._build_fallback_prompt(agent_env, iteration)
     
-    def _build_iteration_status(self, iteration: int, agent_env: AgentEnvironment) -> str:
-        """构建迭代状态信息（不包含重复的工具和上下文信息）"""
-        return f"""
+    async def _build_fallback_prompt(self, agent_env: AgentEnvironment, iteration: int) -> str:
+        """构建降级prompt（当prompt管理器失败时使用）"""
+        
+        logger.warning("使用降级prompt构建方案")
+        
+        fallback_prompt = f"""
+{getattr(agent_env, 'prompt', f'You are a {agent_env.role}.')}
+
+## 当前执行状态
 - 执行轮次: 第 {iteration} 轮
 - 当前角色: {agent_env.role}
 - 迭代计数: {agent_env.iteration_count}
 - 质量评分: {agent_env.quality_score:.2f}
-""".strip()
-    
-    def _build_context_summary(self, context: Any) -> str:
-        """构建上下文摘要"""
+
+## 可用工具
+{', '.join(agent_env.available_tools) if agent_env.available_tools else '当前没有可用的工具'}
+
+## 开始执行
+请开始执行你的任务。
+"""
         
-        if not context:
-            return "无上下文信息"
-        
-        try:
-            # 尝试提取关键信息
-            if hasattr(context, 'isolated_context'):
-                isolated = context.isolated_context
-                if hasattr(isolated, 'sections'):
-                    sections = isolated.sections
-                    summary = []
-                    for section_name, section_obj in sections.items():
-                        if section_obj and hasattr(section_obj, 'content') and section_obj.content.strip():
-                            content = section_obj.content
-                            summary.append(f"### {section_name}\n{content[:200]}{'...' if len(content) > 200 else ''}")
-                    return "\n\n".join(summary)
-            
-            # 降级处理
-            context_str = str(context)
-            return context_str[:500] + "..." if len(context_str) > 500 else context_str
-            
-        except Exception as e:
-            return f"上下文解析失败: {str(e)}"
-    
-    async def _build_tools_info_async(self, available_tools: List[str]) -> str:
-        """异步构建工具信息（详细版本）"""
-        
-        if not available_tools:
-            return "当前没有可用的工具"
-        
-        tools_info = []
-        
-        # 获取详细的工具信息
-        all_tools_info = await self.tool_manager.get_available_tools()
-        tools_dict = {tool["name"]: tool for tool in all_tools_info}
-        
-        for tool_name in available_tools:
-            if tool_name in tools_dict:
-                tool_detail = tools_dict[tool_name]
-                description = tool_detail.get("description", "无描述")
-                category = tool_detail.get("category", "未分类")
-                
-                tools_info.append(f"- **{tool_name}** ({category}): {description}")
-            else:
-                tools_info.append(f"- **{tool_name}**: 可用工具")
-        
-        return "\n".join(tools_info)
+        return fallback_prompt.strip()
     
     def _extract_llm_response(self, llm_result) -> str:
         """从LLM结果中提取响应内容"""

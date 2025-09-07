@@ -6,7 +6,7 @@ UAgent Execution Module
 
 from .role_executor import RoleExecutor, ExecutionConfig
 from .agent_runner import AgentRunner
-from .prompt_manager import PromptManager
+# 移除旧的PromptManager导入，现在使用独立的core.prompt_manager模块
 from .context_compressor import ContextCompressor
 from .execution_controller import ExecutionController
 from .result_synthesizer import ResultSynthesizer
@@ -18,7 +18,7 @@ __all__ = [
     'RoleExecutor',
     'ExecutionConfig', 
     'AgentRunner',
-    'PromptManager',
+    # 移除PromptManager，现在使用独立的core.prompt_manager模块
     'ContextCompressor',
     'ExecutionController',
     'ResultSynthesizer',

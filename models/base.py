@@ -729,7 +729,8 @@ class AgentEnvironment:
     role: str
     context: Any
     available_tools: List[str]
-    prompt: str
+    prompt: Optional[str] = None  # prompt现在可选，由prompt_manager构建
+    role_config: Optional[Any] = None  # 添加role_config支持
     iteration_count: int = 0
     quality_score: float = 0.0
     last_response: Optional[str] = None
@@ -758,3 +759,33 @@ class IterationResult:
     completion_analysis: Any
     is_completed: bool
     next_actions: List[str]
+
+
+@dataclass
+class ExecutionState:
+    """执行状态信息 - 用于prompt构建"""
+    # 基础执行信息
+    iteration: int
+    role: str
+    iteration_count: int
+    quality_score: float
+    
+    # 执行历史
+    last_response: Optional[str] = None
+    previous_actions: List[str] = field(default_factory=list)
+    
+    # 工具执行统计
+    tool_execution_stats: Optional[Dict[str, Any]] = None
+    successful_tool_calls: int = 0
+    failed_tool_calls: int = 0
+    
+    # 完成信号
+    completion_signals: List[str] = field(default_factory=list)
+    is_final_iteration: bool = False
+    
+    # 性能指标
+    execution_time: Optional[float] = None
+    memory_usage: Optional[float] = None
+    
+    # 扩展信息
+    metadata: Dict[str, Any] = field(default_factory=dict)

@@ -11,7 +11,7 @@ from datetime import datetime
 import structlog
 import traceback
 
-from core.execution.prompt_manager import PromptManager
+# 移除对旧PromptManager的依赖，现在使用独立的prompt_manager模块
 from models.base import (
     RoleResult, 
     RoleStatus,
@@ -33,7 +33,7 @@ class RoleExecutor:
     """角色执行器 - 每个角色都是一个完整的Agent"""
     
     def __init__(self, execution_config: ExecutionConfig = None):
-        self.prompt_manager = PromptManager()
+        # 移除旧的PromptManager，现在由AgentRunner内部使用独立的prompt_manager模块
         self.config = execution_config or ExecutionConfig()
         
         # 核心组件
@@ -52,12 +52,11 @@ class RoleExecutor:
         try:
             logger.info(f"开始执行角色 {role}, 执行ID: {execution_id}")
             
-            # 1. 获取角色配置和提示词
+            # 1. 获取角色配置
             role_config = await self._get_role_config(role)
-            role_prompt = await self.prompt_manager.build_role_prompt(role, role_config, context)
             
-            # 2. 创建Agent运行环境
-            agent_env = await self._create_agent_environment(role, context, role_prompt)
+            # 2. 创建Agent运行环境（包含role_config，prompt由AgentRunner内部构建）
+            agent_env = await self._create_agent_environment(role, context, role_config)
             
             # 3. 执行Agent运行循环
             execution_results = []
@@ -117,7 +116,7 @@ class RoleExecutor:
         
         return expert_role.config
     
-    async def _create_agent_environment(self, role: str, context: ExecutionContext, role_prompt: str) -> AgentEnvironment:
+    async def _create_agent_environment(self, role: str, context: ExecutionContext, role_config) -> AgentEnvironment:
         """创建Agent运行环境"""
         
         # 获取可用工具
@@ -127,7 +126,8 @@ class RoleExecutor:
             role=role,
             context=context,
             available_tools=available_tools,
-            prompt=role_prompt
+            role_config=role_config,  # 添加role_config，移除prompt（由AgentRunner内部构建）
+            prompt=None  # prompt现在由AgentRunner内部构建
         )
     
     async def _get_available_tools(self, role: str, context: ExecutionContext) -> List[str]:
