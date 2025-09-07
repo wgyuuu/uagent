@@ -22,7 +22,7 @@ logger = structlog.get_logger(__name__)
 class WorkflowRequest:
     """工作流请求"""
     task: Task
-    preferred_roles: Optional[List[str]] = None
+    workflow_definition: Optional[WorkflowDefinition] = None
     workflow_template: Optional[str] = None
     custom_config: Optional[Dict[str, Any]] = None
     priority: int = 5
@@ -36,15 +36,13 @@ class WorkflowOrchestrator:
     负责工作流的创建、调度、监控和生命周期管理
     """
     
-    def __init__(self, main_agent: MainAgent, workflow_engine: WaterfallWorkflowEngine):
+    def __init__(self, workflow_engine: WaterfallWorkflowEngine):
         """
         初始化工作流编排器
         
         Args:
-            main_agent: 主Agent实例
             workflow_engine: 工作流引擎实例
         """
-        self.main_agent = main_agent
         self.workflow_engine = workflow_engine
         
         # 工作流管理
@@ -82,25 +80,19 @@ class WorkflowOrchestrator:
         try:
             logger.info(f"创建工作流: 任务={request.task.task_id}")
             
-            # 1. 任务分析和角色推荐
-            task_analysis, workflow_definition = await self.main_agent.analyze_and_plan_task(
-                request.task
-            )
+            # 1. 获取或创建工作流定义
+            workflow_definition = request.workflow_definition
             
-            # 2. 应用用户偏好
-            if request.preferred_roles:
-                workflow_definition.roles = request.preferred_roles
-            
-            # 3. 应用自定义配置
+            # 2. 应用自定义配置
             if request.custom_config:
                 for key, value in request.custom_config.items():
                     if hasattr(workflow_definition, key):
                         setattr(workflow_definition, key, value)
             
-            # 4. 创建执行计划
+            # 3. 创建执行计划
             execution_plan = await self._create_execution_plan(workflow_definition)
             
-            # 5. 创建工作流执行实例
+            # 4. 创建工作流执行实例
             workflow_execution = WorkflowExecution(
                 workflow_id=workflow_definition.workflow_id,
                 name=workflow_definition.name,
@@ -117,14 +109,14 @@ class WorkflowOrchestrator:
                 }
             )
             
-            # 6. 存储工作流定义和执行实例
+            # 5. 存储工作流定义和执行实例
             self.workflow_definitions[workflow_definition.workflow_id] = workflow_definition
             self.workflow_executions[workflow_execution.workflow_id] = workflow_execution
             
-            # 7. 添加到队列
+            # 6. 添加到队列
             await self._add_to_queue(workflow_execution, request.priority)
             
-            # 8. 触发创建回调
+            # 7. 触发创建回调
             if self.on_workflow_created:
                 await self.on_workflow_created(workflow_execution)
             

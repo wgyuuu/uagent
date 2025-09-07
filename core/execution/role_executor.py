@@ -12,7 +12,6 @@ import structlog
 import traceback
 
 from core.execution.prompt_manager import PromptManager
-from core.execution.tool_manager import UnifiedToolManager
 from models.base import (
     RoleResult, 
     RoleStatus,
@@ -33,16 +32,12 @@ logger = structlog.get_logger(__name__)
 class RoleExecutor:
     """角色执行器 - 每个角色都是一个完整的Agent"""
     
-    def __init__(self, 
-                 tool_manager: UnifiedToolManager,
-                 execution_config: ExecutionConfig = None):
-        
-        self.tool_manager = tool_manager
-        self.prompt_manager = PromptManager(tool_manager)
+    def __init__(self, execution_config: ExecutionConfig = None):
+        self.prompt_manager = PromptManager()
         self.config = execution_config or ExecutionConfig()
         
         # 核心组件
-        self.agent_runner = AgentRunner(tool_manager)
+        self.agent_runner = AgentRunner()
         self.execution_controller = ExecutionController(self.config)
         self.result_synthesizer = ResultSynthesizer()
         

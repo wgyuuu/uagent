@@ -24,7 +24,7 @@ class MCPToolRegistry:
     - 工具统计信息
     """
     
-    def __init__(self, config_file_path: Optional[str] = None):
+    def __init__(self, config_file_path: Optional[str] = "config/mcp_tools.yaml"):
         """初始化MCP工具注册表"""
         self.config_file_path = config_file_path
         self.registered_tools: Dict[str, MCPToolDefinition] = {}

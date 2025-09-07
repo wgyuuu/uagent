@@ -12,7 +12,7 @@ from .execution_controller import ExecutionController
 from .result_synthesizer import ResultSynthesizer
 
 # 导入新的mcptools包
-from .mcptools import init as init_tool, get_tool_manager
+from .mcptools import init_tool, get_tool_manager
 
 __all__ = [
     'RoleExecutor',

@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 
 from tools.llm import initialize_llm_manager
 from api.routes import register_routes
+from core.execution.mcptools import init_tool
 
 logger = structlog.get_logger(__name__)
 
@@ -68,6 +69,10 @@ async def initialize_core_components():
         # 初始化LLM管理器（在tools/llm模块内全局初始化）
         initialize_llm_manager()
         logger.info("LLM管理器初始化完成")
+        
+        # 初始化工具管理器
+        init_tool()
+        logger.info("工具管理器初始化完成")
         
         logger.info("核心组件初始化完成")
         

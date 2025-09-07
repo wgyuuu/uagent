@@ -9,7 +9,7 @@ from .llm_manager import LLMManager
 # 全局LLM管理器实例
 _llm_manager: LLMManager = None
 
-def initialize_llm_manager(config_path: str = "config/llm_models.yaml") -> LLMManager:
+def initialize_llm_manager(config_path: str = "config/llm_models.yaml"):
     """
     初始化全局LLM管理器
     
@@ -20,9 +20,7 @@ def initialize_llm_manager(config_path: str = "config/llm_models.yaml") -> LLMMa
         LLMManager: 初始化后的LLM管理器实例
     """
     global _llm_manager
-    if _llm_manager is None:
-        _llm_manager = LLMManager(config_path)
-    return _llm_manager
+    _llm_manager = LLMManager(config_path)
 
 def get_llm_manager() -> LLMManager:
     """

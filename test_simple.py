@@ -48,7 +48,7 @@ async def run_simple_test(task_description: str = "创建一个简单的Python H
         logger.info("工作流引擎初始化完成")
         
         # 初始化工作流编排器
-        workflow_orchestrator = WorkflowOrchestrator(main_agent, workflow_engine)
+        workflow_orchestrator = WorkflowOrchestrator(workflow_engine)
         logger.info("工作流编排器初始化完成")
         
         # 2. 创建测试任务
@@ -77,7 +77,7 @@ async def run_simple_test(task_description: str = "创建一个简单的Python H
         
         workflow_request = WorkflowRequest(
             task=test_task,
-            preferred_roles=workflow_definition.roles,
+            workflow_definition=workflow_definition,  # 传递已分析的工作流定义，避免重复分析
             priority=5
         )
         
@@ -234,17 +234,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    # 检查环境变量
-    required_env_vars = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"]
-    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
-    
-    if missing_vars:
-        print("⚠️ 警告: 以下环境变量未设置:")
-        for var in missing_vars:
-            print(f"  - {var}")
-        print("\n💡 提示: 请设置相应的API密钥以确保测试正常运行")
-        print("   如果没有设置，测试可能会失败")
-    
     print("\n" + "="*60)
     print("UAgent 简单测试脚本")
     print("="*60)

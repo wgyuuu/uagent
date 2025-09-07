@@ -5,16 +5,10 @@ UAgent Tools Layer
 """
 
 from .mcp import *
-from .user_question import *
 
 __all__ = [
     # MCP工具
     "MCPToolRegistry",
     "ConfigurableMCPServerManager",
     "BuiltInMCPServerManager",
-    "UserInteractionMCPService",
-    
-    # 用户交互工具
-    "UserQuestionService",
-    "UserSessionManager",
 ]

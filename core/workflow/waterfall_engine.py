@@ -17,6 +17,8 @@ from models.base import (
     IsolatedRoleContext, WorkflowStatus, RoleStatus, ValidationResult, RecoveryDecision, RecoveryStrategy, WorkflowExecution
 )
 from core.intelligence import MainAgent
+from core.execution import RoleExecutor, ExecutionConfig
+from core.execution.mcptools import ToolManager
 
 
 logger = structlog.get_logger(__name__)
@@ -414,8 +416,6 @@ class WaterfallWorkflowEngine:
         调用角色执行器 - 现在是一个完整的Agent运行过程
         """
         try:
-            # 使用新的角色执行器
-            from core.execution import RoleExecutor, ExecutionConfig, UnifiedToolManager
             
             # 创建执行配置
             execution_config = ExecutionConfig(
@@ -427,11 +427,11 @@ class WaterfallWorkflowEngine:
             )
             
             # 创建统一工具管理器
-            tool_manager = UnifiedToolManager()
+            tool_manager = ToolManager()
             
             # 创建角色执行器实例
             role_executor = RoleExecutor(
-                tool_manager=tool_manager,  # 使用新的统一工具管理器
+                tool_manager=tool_manager,  # 使用新的工具管理器
                 execution_config=execution_config
             )
             

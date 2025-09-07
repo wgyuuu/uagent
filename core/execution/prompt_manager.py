@@ -7,7 +7,6 @@ Prompt Manager
 from typing import Dict, List, Optional, Any
 import structlog
 
-from .tool_manager import UnifiedToolManager
 from .execution_controller import ExecutionContext
 from models.roles import RoleConfig
 
@@ -16,8 +15,8 @@ logger = structlog.get_logger(__name__)
 class PromptManager:
     """提示词管理器 - 构建角色专用的提示词"""
     
-    def __init__(self, tool_manager: UnifiedToolManager = None):
-        self.tool_manager = tool_manager
+    def __init__(self):
+        pass
     
     async def build_role_prompt(self, role: str, role_config: RoleConfig, context: ExecutionContext) -> str:
         """构建角色专用的完整提示词"""

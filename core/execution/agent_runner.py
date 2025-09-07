@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any, AsyncGenerator
 from dataclasses import dataclass
 import structlog
 
-from core.execution.tool_manager import UnifiedToolManager
+from core.execution.mcptools import ToolManager
 from tools.llm.llm_manager import LLMManager
 
 from .role_executor import AgentEnvironment, IterationResult
@@ -44,11 +44,22 @@ class CompletionAnalysis:
 class AgentRunner:
     """Agent运行引擎 - 管理单轮Agent推理和执行"""
     
-    def __init__(self, tool_manager: UnifiedToolManager):
-        # 直接使用模块级函数获取LLM实例
+    def __init__(self, tool_manager: ToolManager):
+        # LLM实例
         from tools.llm import get_llm_for_scene
         self.llm = get_llm_for_scene("sub_agent")
+        
+        # 工具管理器
         self.tool_manager = tool_manager
+        
+        # 工具执行统计
+        self.tool_execution_stats = {
+            "total_calls": 0,
+            "successful_calls": 0,
+            "failed_calls": 0,
+            "total_execution_time": 0.0,
+            "tools_used": set()
+        }
     
     async def run_iteration(self, agent_env: AgentEnvironment, iteration: int) -> IterationResult:
         """运行一轮Agent推理"""
@@ -179,8 +190,34 @@ class AgentRunner:
             return "当前没有可用的工具"
         
         tools_info = []
+        
+        # 使用简化的工具信息构建（在异步上下文中应该使用 _build_tools_info_async）
         for tool in available_tools:
-            tools_info.append(f"- **{tool}**: 可用于相关操作")
+            tools_info.append(f"- **{tool}**: 可用工具，支持相关操作")
+        
+        return "\n".join(tools_info)
+    
+    async def _build_tools_info_async(self, available_tools: List[str]) -> str:
+        """异步构建工具信息（详细版本）"""
+        
+        if not available_tools:
+            return "当前没有可用的工具"
+        
+        tools_info = []
+        
+        # 获取详细的工具信息
+        all_tools_info = await self.tool_manager.get_available_tools()
+        tools_dict = {tool["name"]: tool for tool in all_tools_info}
+        
+        for tool_name in available_tools:
+            if tool_name in tools_dict:
+                tool_detail = tools_dict[tool_name]
+                description = tool_detail.get("description", "无描述")
+                category = tool_detail.get("category", "未分类")
+                
+                tools_info.append(f"- **{tool_name}** ({category}): {description}")
+            else:
+                tools_info.append(f"- **{tool_name}**: 可用工具")
         
         return "\n".join(tools_info)
     
@@ -216,24 +253,151 @@ class AgentRunner:
         
         tool_calls = []
         
-        # 这里应该实现更智能的工具调用解析
-        # 暂时使用简单的关键词匹配
-        if "file_operations" in llm_response.lower():
-            tool_calls.append(ToolCall(
-                name="file_operations",
-                arguments={"action": "read", "path": "example.txt"},
-                description="执行文件操作"
-            ))
+        try:
+            # 1. 尝试解析结构化的工具调用（JSON格式）
+            structured_calls = await self._parse_structured_tool_calls(llm_response)
+            tool_calls.extend(structured_calls)
+            
+            # 2. 如果没有找到结构化调用，尝试自然语言解析
+            if not tool_calls:
+                natural_calls = await self._parse_natural_language_tool_calls(llm_response)
+                tool_calls.extend(natural_calls)
+            
+            logger.info(f"解析到 {len(tool_calls)} 个工具调用")
+            return tool_calls
+            
+        except Exception as e:
+            logger.error(f"工具调用解析失败: {e}")
+            return []
+    
+    async def _parse_structured_tool_calls(self, llm_response: str) -> List[ToolCall]:
+        """解析结构化的工具调用（JSON格式）"""
+        import json
+        import re
         
-        if "code_analysis" in llm_response.lower():
-            tool_calls.append(ToolCall(
-                name="code_analysis",
-                arguments={"action": "analyze", "target": "current_code"},
-                description="执行代码分析"
-            ))
+        tool_calls = []
         
-        logger.info(f"解析到 {len(tool_calls)} 个工具调用")
+        # 查找JSON格式的工具调用
+        json_pattern = r'```json\s*(\{.*?\})\s*```|```\s*(\{.*?\})\s*```|\{[^{}]*"tool_name"[^{}]*\}'
+        matches = re.findall(json_pattern, llm_response, re.DOTALL | re.IGNORECASE)
+        
+        for match in matches:
+            try:
+                # match可能是元组，取非空的部分
+                json_str = match[0] if match[0] else (match[1] if len(match) > 1 and match[1] else match)
+                if isinstance(json_str, tuple):
+                    json_str = next((item for item in json_str if item), "")
+                
+                if not json_str:
+                    continue
+                    
+                tool_data = json.loads(json_str)
+                
+                if isinstance(tool_data, dict) and "tool_name" in tool_data:
+                    tool_calls.append(ToolCall(
+                        name=tool_data["tool_name"],
+                        arguments=tool_data.get("parameters", tool_data.get("arguments", {})),
+                        description=tool_data.get("description", f"执行工具: {tool_data['tool_name']}")
+                    ))
+                elif isinstance(tool_data, list):
+                    for item in tool_data:
+                        if isinstance(item, dict) and "tool_name" in item:
+                            tool_calls.append(ToolCall(
+                                name=item["tool_name"],
+                                arguments=item.get("parameters", item.get("arguments", {})),
+                                description=item.get("description", f"执行工具: {item['tool_name']}")
+                            ))
+                            
+            except json.JSONDecodeError:
+                continue
+        
         return tool_calls
+    
+    async def _parse_natural_language_tool_calls(self, llm_response: str) -> List[ToolCall]:
+        """解析自然语言中的工具调用"""
+        tool_calls = []
+        
+        # 获取可用工具列表进行智能匹配
+        tools_info = await self.tool_manager.get_available_tools()
+        available_tools = [tool["name"] for tool in tools_info]
+        
+        # 基于可用工具进行智能匹配
+        response_lower = llm_response.lower()
+        
+        for tool_name in available_tools:
+            tool_lower = tool_name.lower()
+            
+            # 检查工具名称或相关关键词
+            keywords = [tool_lower, tool_lower.replace("_", " ")]
+            
+            # 添加特定工具的关键词
+            if "file" in tool_lower:
+                keywords.extend(["文件", "读取", "写入", "file", "read", "write"])
+            elif "code" in tool_lower:
+                keywords.extend(["代码", "分析", "code", "analyze"])
+            elif "text" in tool_lower:
+                keywords.extend(["文本", "处理", "text", "process"])
+            elif "data" in tool_lower:
+                keywords.extend(["数据", "验证", "data", "validate"])
+            
+            # 检查是否匹配
+            if any(keyword in response_lower for keyword in keywords):
+                # 尝试提取参数（简单实现）
+                arguments = self._extract_tool_arguments(llm_response, tool_name)
+                
+                tool_calls.append(ToolCall(
+                    name=tool_name,
+                    arguments=arguments,
+                    description=f"基于自然语言解析的工具调用: {tool_name}"
+                ))
+        
+        return tool_calls
+    
+    def _extract_tool_arguments(self, llm_response: str, tool_name: str) -> Dict[str, Any]:
+        """从自然语言中提取工具参数（简单实现）"""
+        arguments = {}
+        
+        # 基于工具类型提取常见参数
+        if "file" in tool_name.lower():
+            # 文件操作参数
+            import re
+            
+            # 提取文件路径
+            path_patterns = [
+                r'文件[路径]*[:：]\s*([^\s]+)',
+                r'路径[:：]\s*([^\s]+)',
+                r'file[path]*[:：]\s*([^\s]+)',
+                r'path[:：]\s*([^\s]+)'
+            ]
+            
+            for pattern in path_patterns:
+                match = re.search(pattern, llm_response, re.IGNORECASE)
+                if match:
+                    arguments["path"] = match.group(1)
+                    break
+            
+            # 提取操作类型
+            if any(word in llm_response.lower() for word in ["读取", "read", "查看"]):
+                arguments["action"] = "read"
+            elif any(word in llm_response.lower() for word in ["写入", "write", "创建"]):
+                arguments["action"] = "write"
+            else:
+                arguments["action"] = "read"  # 默认
+                
+        elif "code" in tool_name.lower():
+            # 代码分析参数
+            arguments["action"] = "analyze"
+            arguments["target"] = "current_code"
+            
+        elif "text" in tool_name.lower():
+            # 文本处理参数
+            arguments["action"] = "process"
+            
+        elif "data" in tool_name.lower():
+            # 数据验证参数
+            arguments["action"] = "validate"
+        
+        return arguments
     
     async def _execute_tools_parallel(self, tool_calls: List[ToolCall], agent_env: AgentEnvironment) -> List[ToolResult]:
         """并行执行工具调用"""
@@ -243,74 +407,89 @@ class AgentRunner:
         
         logger.info(f"开始并行执行 {len(tool_calls)} 个工具")
         
-        # 分析工具调用的并发安全性
-        safe_tools, unsafe_tools = self._categorize_tools_by_safety(tool_calls)
-        
-        # 并行执行安全工具
-        safe_results = []
-        if safe_tools:
-            safe_tasks = [
-                self._execute_single_tool(tool_call, agent_env) 
-                for tool_call in safe_tools
-            ]
-            safe_results = await asyncio.gather(*safe_tasks, return_exceptions=True)
-            
-            # 处理异常结果
-            safe_results = [
-                result if not isinstance(result, Exception) 
-                else ToolResult(
-                    tool_call=tool_call,
-                    success=False,
-                    error=str(result)
-                )
-                for result, tool_call in zip(safe_results, safe_tools)
-            ]
-        
-        # 顺序执行不安全工具
-        unsafe_results = []
-        for tool_call in unsafe_tools:
-            try:
-                result = await self._execute_single_tool(tool_call, agent_env)
-                unsafe_results.append(result)
-            except Exception as e:
-                logger.error(f"工具 {tool_call.name} 执行失败: {e}")
-                unsafe_results.append(ToolResult(
-                    tool_call=tool_call,
-                    success=False,
-                    error=str(e)
-                ))
-        
-        # 合并结果，保持原始顺序
-        all_results = []
-        safe_idx = 0
-        unsafe_idx = 0
-        
-        for tool_call in tool_calls:
-            if tool_call in safe_tools:
-                all_results.append(safe_results[safe_idx])
-                safe_idx += 1
-            else:
-                all_results.append(unsafe_results[unsafe_idx])
-                unsafe_idx += 1
-        
-        logger.info(f"工具执行完成，成功: {sum(1 for r in all_results if r.success)}/{len(all_results)}")
-        return all_results
+        # 使用工具管理器批量执行
+        return await self._execute_tools_batch_via_manager(tool_calls, agent_env)
     
-    def _categorize_tools_by_safety(self, tool_calls: List[ToolCall]) -> tuple[List[ToolCall], List[ToolCall]]:
-        """按安全性分类工具调用"""
+    async def _execute_tools_batch_via_manager(self, tool_calls: List[ToolCall], agent_env: AgentEnvironment) -> List[ToolResult]:
+        """通过工具管理器批量执行工具"""
         
-        safe_tools = []
-        unsafe_tools = []
-        
+        # 构建工具调用格式
+        batch_calls = []
         for tool_call in tool_calls:
-            # 这里应该根据工具配置判断并发安全性
-            # 暂时将读取类操作视为安全，写入类操作视为不安全
-            if tool_call.name in ["file_operations", "code_analysis"]:
-                safe_tools.append(tool_call)
-            else:
-                unsafe_tools.append(tool_call)
+            batch_calls.append({
+                "tool_name": tool_call.name,
+                "parameters": tool_call.arguments,
+                "description": tool_call.description
+            })
         
-        return safe_tools, unsafe_tools
+        # 构建执行上下文
+        context = {
+            "agent_env": agent_env,
+            "iteration_context": getattr(agent_env, 'context', {}),
+            "available_tools": getattr(agent_env, 'available_tools', [])
+        }
+        
+        # 使用工具管理器批量执行
+        tool_execution_results = await self.tool_manager.execute_tools_batch(batch_calls, context)
+        
+        # 转换结果格式
+        results = []
+        for i, (tool_call, execution_result) in enumerate(zip(tool_calls, tool_execution_results)):
+            results.append(ToolResult(
+                tool_call=tool_call,
+                success=execution_result.success,
+                output=execution_result.result,
+                error=execution_result.error,
+                execution_time=execution_result.execution_time
+            ))
+        
+        # 更新统计信息
+        self._update_tool_execution_stats(results)
+        
+        logger.info(f"批量工具执行完成，成功: {sum(1 for r in results if r.success)}/{len(results)}")
+        return results
+    
+    
+    
+    def _update_tool_execution_stats(self, tool_results: List[ToolResult]):
+        """更新工具执行统计信息"""
+        
+        for result in tool_results:
+            self.tool_execution_stats["total_calls"] += 1
+            self.tool_execution_stats["total_execution_time"] += result.execution_time
+            self.tool_execution_stats["tools_used"].add(result.tool_call.name)
+            
+            if result.success:
+                self.tool_execution_stats["successful_calls"] += 1
+            else:
+                self.tool_execution_stats["failed_calls"] += 1
+    
+    def get_tool_execution_stats(self) -> Dict[str, Any]:
+        """获取工具执行统计信息"""
+        
+        stats = self.tool_execution_stats.copy()
+        stats["tools_used"] = list(stats["tools_used"])  # 转换为列表
+        
+        # 计算平均执行时间
+        if stats["total_calls"] > 0:
+            stats["average_execution_time"] = stats["total_execution_time"] / stats["total_calls"]
+            stats["success_rate"] = stats["successful_calls"] / stats["total_calls"]
+        else:
+            stats["average_execution_time"] = 0.0
+            stats["success_rate"] = 0.0
+        
+        return stats
+    
+    def reset_tool_execution_stats(self):
+        """重置工具执行统计信息"""
+        
+        self.tool_execution_stats = {
+            "total_calls": 0,
+            "successful_calls": 0,
+            "failed_calls": 0,
+            "total_execution_time": 0.0,
+            "tools_used": set()
+        }
     
     async def _execute_single_tool(self, tool_call: ToolCall, agent_env: AgentEnvironment) -> ToolResult:
         """执行单个工具"""
@@ -320,19 +499,27 @@ class AgentRunner:
         try:
             logger.info(f"执行工具: {tool_call.name}")
             
-            # 这里应该调用实际的工具管理器
-            # 暂时模拟工具执行
-            await asyncio.sleep(0.1)  # 模拟执行时间
+            # 使用工具管理器执行工具
+            context = {
+                "agent_env": agent_env,
+                "iteration_context": getattr(agent_env, 'context', {}),
+                "available_tools": getattr(agent_env, 'available_tools', [])
+            }
             
-            # 模拟工具输出
-            output = f"工具 {tool_call.name} 执行结果: {tool_call.arguments}"
+            tool_execution_result = await self.tool_manager.execute_tool(
+                tool_name=tool_call.name,
+                parameters=tool_call.arguments,
+                context=context
+            )
             
             execution_time = asyncio.get_event_loop().time() - start_time
             
+            # 转换为 AgentRunner 的 ToolResult 格式
             return ToolResult(
                 tool_call=tool_call,
-                success=True,
-                output=output,
+                success=tool_execution_result.success,
+                output=tool_execution_result.result,
+                error=tool_execution_result.error,
                 execution_time=execution_time
             )
             
@@ -390,15 +577,25 @@ class AgentRunner:
                 "完成最终交付"
             ]
         
+        # 计算质量指标
+        tool_success_rate = sum(1 for r in tool_results if r.success) / len(tool_results) if tool_results else 0
+        execution_efficiency = len(tool_results) > 0
+        
+        # 获取工具执行统计信息
+        execution_stats = self.get_tool_execution_stats()
+        
         return CompletionAnalysis(
             is_completed=is_completed,
             completion_reason=completion_reason,
             confidence_score=0.8 if is_completed else 0.6,
             next_actions=next_actions,
             quality_indicators={
-                "tool_success_rate": sum(1 for r in tool_results if r.success) / len(tool_results) if tool_results else 0,
-                "execution_efficiency": len(tool_results) > 0,
-                "context_quality": agent_env.quality_score
+                "tool_success_rate": tool_success_rate,
+                "execution_efficiency": execution_efficiency,
+                "context_quality": agent_env.quality_score,
+                "total_tools_used": len(execution_stats["tools_used"]),
+                "overall_success_rate": execution_stats["success_rate"],
+                "average_execution_time": execution_stats["average_execution_time"]
             }
         )
     

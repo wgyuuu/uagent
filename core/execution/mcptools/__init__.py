@@ -16,7 +16,7 @@ def get_tool_manager() -> ToolManager:
         raise RuntimeError("mcptools包尚未初始化，请先调用 mcptools.init()")
     return _tool_manager
 
-async def init(config_file_path: str = None):
+async def init_tool(config_file_path: str = None):
     """
     初始化mcptools包
     
@@ -37,6 +37,6 @@ async def init(config_file_path: str = None):
 
 __all__ = [
     "ToolManager",
-    "init",
+    "init_tool",
     "get_tool_manager",
 ]
