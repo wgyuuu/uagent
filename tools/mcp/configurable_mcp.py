@@ -33,9 +33,8 @@ class MCPServerConfig:
     password: Optional[str] = None
     timeout: int = 30
     max_retries: int = 3
+    retry_enabled: bool = False  # 是否启用重试
     rate_limit: Optional[int] = None  # 每分钟请求数
-    health_check_url: Optional[str] = None
-    health_check_interval: int = 300  # 秒
     enabled: bool = True
     metadata: Dict[str, Any] = None
 
@@ -60,30 +59,22 @@ class ConfigurableMCPServerManager:
     """
     可配置MCP服务器管理器
     
-    管理通过配置文件定义的HTTP MCP服务，支持动态加载、健康检查、认证和限流
+    管理通过配置文件定义的HTTP MCP服务，支持动态加载、认证、限流和可选重试
     """
     
-    def __init__(self, config_file_path: Optional[str] = None):
-        self.config_file_path = config_file_path
+    def __init__(self):
+        self.config_file_path: Optional[str] = None
         self.servers: Dict[str, MCPServerConfig] = {}
         self.tools: Dict[str, MCPToolInfo] = {}
         self.server_sessions: Dict[str, aiohttp.ClientSession] = {}
-        self.health_status: Dict[str, Dict[str, Any]] = {}
         self.rate_limit_trackers: Dict[str, List[float]] = {}
-        
-        # 加载配置
-        if config_file_path:
-            self.load_config(config_file_path)
-        
-        # 启动健康检查任务
-        self.health_check_task = None
-        self._start_health_check_task()
         
         logger.info("可配置MCP服务器管理器初始化完成")
     
-    def load_config(self, config_file_path: str):
+    async def load_config(self, config_file_path: str):
         """从配置文件加载MCP服务器配置"""
         try:
+            self.config_file_path = config_file_path
             logger.info(f"加载MCP配置: {config_file_path}")
             
             with open(config_file_path, 'r', encoding='utf-8') as f:
@@ -147,14 +138,6 @@ class ConfigurableMCPServerManager:
             # 创建HTTP会话
             await self._create_server_session(server_config.server_id)
             
-            # 初始化健康状态
-            self.health_status[server_config.server_id] = {
-                "status": "unknown",
-                "last_check": None,
-                "response_time": None,
-                "error_count": 0
-            }
-            
             # 初始化限流跟踪器
             self.rate_limit_trackers[server_config.server_id] = []
             
@@ -187,8 +170,6 @@ class ConfigurableMCPServerManager:
             
             # 清理其他状态
             del self.servers[server_id]
-            if server_id in self.health_status:
-                del self.health_status[server_id]
             if server_id in self.rate_limit_trackers:
                 del self.rate_limit_trackers[server_id]
             
@@ -252,10 +233,6 @@ class ConfigurableMCPServerManager:
             
             tool_info = self.tools[tool_id]
             server_id = tool_info.server_id
-            
-            # 检查服务器状态
-            if not await self._is_server_healthy(server_id):
-                raise RuntimeError(f"服务器 {server_id} 不健康")
             
             # 检查限流
             if not await self._check_rate_limit(server_id):
@@ -372,23 +349,14 @@ class ConfigurableMCPServerManager:
         session = self.server_sessions[server_id]
         server_config = self.servers[server_id]
         
+        # 如果未启用重试，直接执行一次请求
+        if not server_config.retry_enabled:
+            return await self._execute_single_request(method, url, headers, data, timeout, session)
+        
+        # 启用重试逻辑
         for attempt in range(server_config.max_retries + 1):
             try:
-                if method.upper() == "GET":
-                    async with session.get(url, headers=headers, timeout=timeout) as response:
-                        return await self._handle_response(response)
-                elif method.upper() == "POST":
-                    async with session.post(url, headers=headers, json=data, timeout=timeout) as response:
-                        return await self._handle_response(response)
-                elif method.upper() == "PUT":
-                    async with session.put(url, headers=headers, json=data, timeout=timeout) as response:
-                        return await self._handle_response(response)
-                elif method.upper() == "DELETE":
-                    async with session.delete(url, headers=headers, timeout=timeout) as response:
-                        return await self._handle_response(response)
-                else:
-                    raise ValueError(f"不支持的HTTP方法: {method}")
-                    
+                return await self._execute_single_request(method, url, headers, data, timeout, session)
             except asyncio.TimeoutError:
                 if attempt < server_config.max_retries:
                     logger.warning(f"请求超时，重试 {attempt + 1}/{server_config.max_retries}")
@@ -396,7 +364,6 @@ class ConfigurableMCPServerManager:
                     continue
                 else:
                     raise RuntimeError(f"请求超时，已重试 {server_config.max_retries} 次")
-            
             except Exception as e:
                 if attempt < server_config.max_retries:
                     logger.warning(f"请求失败，重试 {attempt + 1}/{server_config.max_retries}: {e}")
@@ -406,6 +373,31 @@ class ConfigurableMCPServerManager:
                     raise
         
         raise RuntimeError("所有重试都失败了")
+    
+    async def _execute_single_request(
+        self,
+        method: str,
+        url: str,
+        headers: Dict[str, str],
+        data: Dict[str, Any],
+        timeout: int,
+        session: aiohttp.ClientSession
+    ) -> Any:
+        """执行单次HTTP请求"""
+        if method.upper() == "GET":
+            async with session.get(url, headers=headers, timeout=timeout) as response:
+                return await self._handle_response(response)
+        elif method.upper() == "POST":
+            async with session.post(url, headers=headers, json=data, timeout=timeout) as response:
+                return await self._handle_response(response)
+        elif method.upper() == "PUT":
+            async with session.put(url, headers=headers, json=data, timeout=timeout) as response:
+                return await self._handle_response(response)
+        elif method.upper() == "DELETE":
+            async with session.delete(url, headers=headers, timeout=timeout) as response:
+                return await self._handle_response(response)
+        else:
+            raise ValueError(f"不支持的HTTP方法: {method}")
     
     async def _handle_response(self, response: aiohttp.ClientResponse) -> Any:
         """处理HTTP响应"""
@@ -421,14 +413,6 @@ class ConfigurableMCPServerManager:
             return await response.text()
         else:
             return await response.read()
-    
-    async def _is_server_healthy(self, server_id: str) -> bool:
-        """检查服务器是否健康"""
-        if server_id not in self.health_status:
-            return False
-        
-        health_info = self.health_status[server_id]
-        return health_info["status"] == "healthy"
     
     async def _check_rate_limit(self, server_id: str) -> bool:
         """检查限流"""
@@ -454,100 +438,6 @@ class ConfigurableMCPServerManager:
         tracker.append(current_time)
         return True
     
-    async def _start_health_check_task(self):
-        """启动健康检查任务"""
-        async def health_check_loop():
-            while True:
-                try:
-                    await self._perform_health_checks()
-                    await asyncio.sleep(60)  # 每分钟检查一次
-                except Exception as e:
-                    logger.error(f"健康检查任务出错: {e}")
-                    await asyncio.sleep(60)
-        
-        self.health_check_task = asyncio.create_task(health_check_loop())
-        logger.info("健康检查任务已启动")
-    
-    async def _perform_health_checks(self):
-        """执行健康检查"""
-        for server_id, server_config in self.servers.items():
-            if not server_config.enabled:
-                continue
-            
-            try:
-                await self._check_server_health(server_id)
-            except Exception as e:
-                logger.error(f"检查服务器 {server_id} 健康状态失败: {e}")
-    
-    async def _check_server_health(self, server_id: str):
-        """检查单个服务器健康状态"""
-        server_config = self.servers[server_id]
-        health_url = server_config.health_check_url or f"{server_config.base_url}/health"
-        
-        try:
-            start_time = time.time()
-            session = self.server_sessions.get(server_id)
-            
-            if not session:
-                await self._create_server_session(server_id)
-                session = self.server_sessions[server_id]
-            
-            async with session.get(health_url, timeout=10) as response:
-                response_time = time.time() - start_time
-                
-                if response.status == 200:
-                    health_data = await response.json()
-                    status = "healthy"
-                    error_count = 0
-                else:
-                    status = "unhealthy"
-                    error_count = self.health_status[server_id]["error_count"] + 1
-                    response_time = None
-                
-                # 更新健康状态
-                self.health_status[server_id].update({
-                    "status": status,
-                    "last_check": datetime.now().isoformat(),
-                    "response_time": response_time,
-                    "error_count": error_count
-                })
-                
-        except Exception as e:
-            error_count = self.health_status[server_id]["error_count"] + 1
-            self.health_status[server_id].update({
-                "status": "unhealthy",
-                "last_check": datetime.now().isoformat(),
-                "response_time": None,
-                "error_count": error_count
-            })
-            
-            logger.warning(f"服务器 {server_id} 健康检查失败: {e}")
-    
-    async def get_server_status(self, server_id: str) -> Optional[Dict[str, Any]]:
-        """获取服务器状态"""
-        if server_id not in self.servers:
-            return None
-        
-        server_config = self.servers[server_id]
-        health_info = self.health_status.get(server_id, {})
-        
-        return {
-            "server_id": server_id,
-            "name": server_config.name,
-            "description": server_config.description,
-            "base_url": server_config.base_url,
-            "enabled": server_config.enabled,
-            "health_status": health_info,
-            "tools_count": len([t for t in self.tools.values() if t.server_id == server_id])
-        }
-    
-    async def get_all_servers_status(self) -> List[Dict[str, Any]]:
-        """获取所有服务器状态"""
-        return [
-            await self.get_server_status(server_id)
-            for server_id in self.servers.keys()
-        ]
-    
     async def get_tool_info(self, tool_id: str) -> Optional[MCPToolInfo]:
         """获取工具信息"""
         return self.tools.get(tool_id)
@@ -566,14 +456,6 @@ class ConfigurableMCPServerManager:
     async def shutdown(self):
         """关闭管理器"""
         try:
-            # 停止健康检查任务
-            if self.health_check_task:
-                self.health_check_task.cancel()
-                try:
-                    await self.health_check_task
-                except asyncio.CancelledError:
-                    pass
-            
             # 关闭所有HTTP会话
             for session in self.server_sessions.values():
                 await session.close()
