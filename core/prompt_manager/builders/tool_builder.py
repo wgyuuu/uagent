@@ -116,7 +116,7 @@ class ToolBuilder(BasePromptBuilder):
         
         return """
 
-## 工具调用格式规范
+### 工具调用格式规范
 
 请使用以下XML格式调用工具：
 
@@ -131,7 +131,7 @@ class ToolBuilder(BasePromptBuilder):
     </args>
 </tool_name>
 
-## 工具使用原则
+### 工具使用原则
 1. 明确说明使用工具的目的和目标
 2. 提供必要的参数和上下文信息
 3. 一次调用一个工具，避免复杂嵌套
