@@ -141,32 +141,8 @@ class AgentRunner:
             return full_prompt
             
         except Exception as e:
-            logger.error(f"使用prompt管理器构建prompt失败: {e}")
-            # 降级到基础prompt
-            return await self._build_fallback_prompt(agent_env, iteration)
-    
-    async def _build_fallback_prompt(self, agent_env: AgentEnvironment, iteration: int) -> str:
-        """构建降级prompt（当prompt管理器失败时使用）"""
-        
-        logger.warning("使用降级prompt构建方案")
-        
-        fallback_prompt = f"""
-{getattr(agent_env, 'prompt', f'You are a {agent_env.role}.')}
-
-## 当前执行状态
-- 执行轮次: 第 {iteration} 轮
-- 当前角色: {agent_env.role}
-- 迭代计数: {agent_env.iteration_count}
-- 质量评分: {agent_env.quality_score:.2f}
-
-## 可用工具
-{', '.join(agent_env.available_tools) if agent_env.available_tools else '当前没有可用的工具'}
-
-## 开始执行
-请开始执行你的任务。
-"""
-        
-        return fallback_prompt.strip()
+            raise Exception(f"使用prompt管理器构建prompt失败: {e}")
+            
     
     def _extract_llm_response(self, llm_result) -> str:
         """从LLM结果中提取响应内容"""

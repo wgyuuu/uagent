@@ -18,7 +18,6 @@ from .builders.base_builder import BasePromptBuilder
 from .builders.role_identity_builder import RoleIdentityBuilder
 from .builders.context_builder import ContextBuilder
 from .builders.tool_builder import ToolBuilder
-from .builders.state_builder import StateBuilder
 from .builders.guidance_builder import GuidanceBuilder
 from .processors.context_processor import ContextProcessor
 
@@ -48,7 +47,6 @@ class RuntimePromptManager:
             'role_identity': RoleIdentityBuilder(),
             'context': ContextBuilder(),
             'tools': ToolBuilder(),  # 移除tool_cache参数
-            'state': StateBuilder(),
             'guidance': GuidanceBuilder()
         }
         
@@ -180,11 +178,6 @@ class RuntimePromptManager:
         
         fallback_prompt = f"""
 {request.role_config.prompt_template}
-
-## 当前执行状态
-- 执行轮次: 第 {request.execution_state.iteration} 轮
-- 当前角色: {request.execution_state.role}
-- 质量评分: {request.execution_state.quality_score:.2f}
 
 ## 可用工具
 {', '.join(request.available_tools) if request.available_tools else '当前没有可用的工具'}

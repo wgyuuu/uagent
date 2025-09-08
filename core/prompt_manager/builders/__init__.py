@@ -8,7 +8,6 @@ from .base_builder import BasePromptBuilder
 from .role_identity_builder import RoleIdentityBuilder
 from .context_builder import ContextBuilder
 from .tool_builder import ToolBuilder
-from .state_builder import StateBuilder
 from .guidance_builder import GuidanceBuilder
 
 __all__ = [
@@ -16,6 +15,5 @@ __all__ = [
     'RoleIdentityBuilder',
     'ContextBuilder', 
     'ToolBuilder',
-    'StateBuilder',
     'GuidanceBuilder'
 ]

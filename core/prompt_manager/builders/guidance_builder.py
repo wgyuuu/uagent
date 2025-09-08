@@ -43,15 +43,14 @@ class GuidanceBuilder(BasePromptBuilder):
             guidance_section += self._get_task_execution_guidance()
             
             # 系统提醒
-            guidance_section += await self._build_system_reminder(role)
+            guidance_section += "\n" + await self._build_system_reminder(role)
             
             logger.debug(f"构建系统指导section完成")
             return guidance_section.strip()
             
         except Exception as e:
             logger.error(f"构建系统指导section失败: {e}")
-            # 降级处理
-            return await self._build_basic_guidance_section(request.role)
+            return ""
     
     async def _build_role_specific_guidance(self, role_config) -> str:
         """构建角色特定的执行指导"""
@@ -126,7 +125,6 @@ class GuidanceBuilder(BasePromptBuilder):
         
         return f"""
 ### 重要提醒
-<system-reminder>
 你是一个专业的{role}，专注于完成当前任务。请遵循以下原则：
 
 **执行原则：**
@@ -141,31 +139,22 @@ class GuidanceBuilder(BasePromptBuilder):
 - 任务完成状态（完成/部分完成/需要更多信息）
 - 主要交付物和成果
 - 下一步建议或注意事项
-</system-reminder>"""
-    
-    async def _build_basic_guidance_section(self, role: str) -> str:
-        """构建基本指导section（降级方案）"""
-        
-        return f"""## 系统执行指导
-
-### 质量标准
-- 确保输出符合专业标准
-- 遵循最佳实践和行业标准
-- 及时识别和报告问题
-
-{self._get_task_execution_guidance()}
-
-{await self._build_system_reminder(role)}"""
+"""
     
     def get_section_name(self) -> str:
+        """获取section名称"""
         return "guidance"
     
     def get_priority(self) -> int:
-        return 50
+        """获取构建优先级"""
+        return 50  # 较低优先级，在其他核心section之后
     
     def is_required(self) -> bool:
+        """是否为必需的section"""
         return True
     
     async def validate_input(self, request: 'PromptBuildRequest') -> bool:
         """验证输入参数"""
-        return request.role is not None and request.role_config is not None
+        return (request.role_config is not None and 
+                request.role is not None)
+    
